@@ -1,0 +1,40 @@
+{
+  "name": "mambascript",
+  "version": "1.0.0",
+  "description": "🐍 Linguagem de programação moçambicana - Rápida, poderosa e em português!",
+  "main": "index.js",
+  "bin": {
+    "mambas": "./mambas"
+  },
+  "scripts": {
+    "test": "node mambas exemplos/ola.ms"
+  },
+  "keywords": [
+    "mambascript",
+    "mozambique",
+    "moçambique",
+    "programming",
+    "portuguese",
+    "português",
+    "language",
+    "linguagem",
+    "interpreter",
+    "compiler"
+  ],
+  "author": "Habibo Salimo Julio <eliobrostech3@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Eliobros/MambaScript.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Eliobros/MambaScript/issues"
+  },
+  "homepage": "https://github.com/Eliobros/MambaScript#readme",
+  "engines": {
+    "node": ">=14.0.0"
+  },
+  "dependencies": {
+    "prompt-sync": "^4.2.0"
+  }
+}

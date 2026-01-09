@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+
+const fs = require('fs');
+const path = require('path');
+
+// Resolve o caminho dos módulos relativos ao diretório do script
+const scriptDir = __dirname;
+const Lexer = require(path.join(scriptDir, 'Lexer', 'lexer'));
+const Parser = require(path.join(scriptDir, 'Parser', 'parser'));
+const Evaluator = require(path.join(scriptDir, 'Evaluator', 'evaluate'));
+
+// Verifica se foi passado um arquivo
+if (process.argv.length < 3) {
+    console.log('Uso: mambas <arquivo.ms>');
+    console.log('');
+    console.log('Exemplos:');
+    console.log('  mambas programa.ms');
+    console.log('  mambas /caminho/completo/arquivo.ms');
+    process.exit(1);
+}
+
+// Lê o arquivo .ms
+const filename = process.argv[2];
+
+// Resolve o caminho completo do arquivo
+const fullPath = path.isAbsolute(filename) 
+    ? filename 
+    : path.join(process.cwd(), filename);
+
+if (!fs.existsSync(fullPath)) {
+    console.error(`Erro: Arquivo não encontrado: ${filename}`);
+    process.exit(1);
+}
+
+const code = fs.readFileSync(fullPath, 'utf-8');
+
+try {
+    // Lexer
+    const lexer = new Lexer(code);
+    const tokens = lexer.tokenize();
+    
+    // Parser
+    const parser = new Parser(tokens);
+    const ast = parser.parse();
+    
+    // Evaluator
+    const evaluator = new Evaluator();
+    evaluator.execute(ast);
+    
+} catch (error) {
+    console.error('❌ Erro MambaScript:', error.message);
+    process.exit(1);
+}
