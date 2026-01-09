@@ -1,0 +1,14 @@
+# Arquivos de teste
+*.log
+teste.ms
+main.ms
+entrada.ms
+server.js
+index.js
+
+# Git
+.git
+.gitignore
+
+# Exemplos (opcional - se quiser incluir, remove esta linha)
+ exemplos/
