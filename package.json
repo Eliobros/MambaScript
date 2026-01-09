@@ -1,5 +1,5 @@
 {
-  "name": "mambascript",
+  "name": "@eliobros/mambascript",
   "version": "1.0.0",
   "description": "🐍 Linguagem de programação moçambicana - Rápida, poderosa e em português!",
   "main": "index.js",
