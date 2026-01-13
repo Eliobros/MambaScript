@@ -5,7 +5,7 @@ class Evaluator {
         this.returnValue = null;
         this.builtinFunctions = {
             'hoje': this.createDateObject.bind(this),
-	    'ler': this.lerInput.bind(this) 
+            'ler': this.lerInput.bind(this)
         };
     }
 
@@ -19,7 +19,6 @@ class Evaluator {
         switch (node.type) {
             case 'Print':
                 const printValue = this.evaluate(node.value);
-                // Se for um objeto de data, mostra representação amigável
                 if (printValue && printValue._type === 'DateObject') {
                     console.log(`Data: ${printValue.mostrarData()} às ${printValue.mostrarHora()}`);
                 } else {
@@ -63,16 +62,11 @@ class Evaluator {
     }
 
     evaluate(node) {
-        if (!node) {
-            throw new Error('Nó inválido: undefined');
-        }
+        if (!node) throw new Error('Nó inválido');
 
         switch (node.type) {
-            case 'Number':
-                return node.value;
-
-            case 'String':
-                return node.value;
+            case 'Number': return node.value;
+            case 'String': return node.value;
 
             case 'Identifier':
                 if (!(node.name in this.variables)) {
@@ -84,8 +78,25 @@ class Evaluator {
                 const left = this.evaluate(node.left);
                 const right = this.evaluate(node.right);
 
+                if (node.operator === 'PLUS') {
+                    // SOMA: Ambos precisam ser números
+                    if (typeof left === 'number' && typeof right === 'number') {
+                        return left + right;
+                    }
+                    // CONCATENAÇÃO: Ambos precisam ser strings
+                    if (typeof left === 'string' && typeof right === 'string') {
+                        return left + right;
+                    }
+                    // ERRO: Tipos misturados
+                    throw new Error(`Erro de Tipo: Não é possível somar ${typeof left} com ${typeof right}. Use .paraTexto() ou .paraNumero().`);
+                }
+
+                // Outras operações aritméticas (sempre esperam números)
+                if (typeof left !== 'number' || typeof right !== 'number') {
+                    throw new Error(`Operação ${node.operator} permitida apenas entre números.`);
+                }
+
                 switch (node.operator) {
-                    case 'PLUS': return left + right;
                     case 'MINUS': return left - right;
                     case 'MULTIPLY': return left * right;
                     case 'DIVIDE': return left / right;
@@ -95,7 +106,6 @@ class Evaluator {
             case 'Comparison':
                 const leftComp = this.evaluate(node.left);
                 const rightComp = this.evaluate(node.right);
-
                 switch (node.operator) {
                     case 'GREATER': return leftComp > rightComp;
                     case 'LESS': return leftComp < rightComp;
@@ -106,41 +116,28 @@ class Evaluator {
                 }
 
             case 'FunctionCall':
-                // Verifica se é função built-in
                 if (node.name in this.builtinFunctions) {
                     const args = node.args.map(arg => this.evaluate(arg));
                     return this.builtinFunctions[node.name](...args);
                 }
-                
                 if (!(node.name in this.functions)) {
                     throw new Error(`Função não definida: ${node.name}`);
                 }
-                
                 const func = this.functions[node.name];
-                
-                // Salva o estado atual
                 const oldVars = {...this.variables};
                 const oldReturnValue = this.returnValue;
                 this.returnValue = null;
-                
-                // Atribui argumentos aos parâmetros
+
                 for (let i = 0; i < func.params.length; i++) {
                     this.variables[func.params[i]] = this.evaluate(node.args[i]);
                 }
-                
-                // Executa corpo da função
                 for (const stmt of func.body) {
                     this.executeStatement(stmt);
                     if (this.returnValue !== null) break;
                 }
-                
-                // Captura o resultado
                 const result = this.returnValue;
-                
-                // Restaura o estado
                 this.returnValue = oldReturnValue;
                 this.variables = oldVars;
-                
                 return result !== null ? result : undefined;
 
             case 'MethodCall':
@@ -152,67 +149,24 @@ class Evaluator {
         }
     }
 
-    createDateObject(timezone) {
-        const now = new Date();
-        
-        // Opções de formatação com timezone
-        const options = timezone ? { timeZone: timezone } : {};
-        
-        // Função helper para converter data no timezone correto
-        const getDateInTimezone = () => {
-            if (timezone) {
-                // Cria string ISO no timezone e converte de volta para Date
-                const isoString = now.toLocaleString('en-US', { timeZone: timezone });
-                return new Date(isoString);
-            }
-            return now;
-        };
-        
-        const localDate = getDateInTimezone();
-        
-        return {
-            _type: 'DateObject',
-            _date: now,
-            _timezone: timezone || 'Local',
-            mostrarHora: () => {
-                return now.toLocaleTimeString('pt-BR', options);
-            },
-            mostrarData: () => {
-                return now.toLocaleDateString('pt-BR', options);
-            },
-            dia: () => {
-                return localDate.getDate();
-            },
-            mes: () => {
-                return localDate.getMonth() + 1;
-            },
-            ano: () => {
-                return localDate.getFullYear();
-            },
-            hora: () => {
-                return localDate.getHours();
-            },
-            minuto: () => {
-                return localDate.getMinutes();
-            },
-            segundo: () => {
-                return localDate.getSeconds();
-            },
-            timezone: () => {
-                return timezone || 'Local';
-            }
-        };
-    }
-
-
-	lerInput() {
-        const prompt = require('prompt-sync')({ sigint: true });
-        return prompt('');
-    }
-
     callMethod(obj, methodName, args) {
+        // --- TRATAMENTO DE TIPOS PRIMITIVOS (Bridge) ---
+        if (typeof obj === 'string') {
+            if (methodName === 'paraNumero') {
+                const n = Number(obj);
+                if (isNaN(n)) throw new Error(`"${obj}" não é um número válido.`);
+                return n;
+            }
+        }
+        if (typeof obj === 'number') {
+            if (methodName === 'paraTexto') {
+                return String(obj);
+            }
+        }
+
+        // --- TRATAMENTO DE OBJETOS (como DateObject) ---
         if (!obj || typeof obj !== 'object') {
-            throw new Error(`Tentando chamar método em valor não-objeto`);
+            throw new Error(`O valor do tipo ${typeof obj} não possui o método "${methodName}"`);
         }
 
         if (!(methodName in obj)) {
@@ -220,16 +174,35 @@ class Evaluator {
         }
 
         const method = obj[methodName];
-        
-        if (typeof method !== 'function') {
-            throw new Error(`${methodName} não é um método`);
-        }
-
-        // Avalia os argumentos
         const evaluatedArgs = args.map(arg => this.evaluate(arg));
-        
         return method(...evaluatedArgs);
+    }
+
+    createDateObject(timezone) {
+        const now = new Date();
+        const options = timezone ? { timeZone: timezone } : {};
+        const getDateInTimezone = () => {
+            if (timezone) {
+                const isoString = now.toLocaleString('en-US', { timeZone: timezone });
+                return new Date(isoString);
+            }
+            return now;
+        };
+        const localDate = getDateInTimezone();
+
+        return {
+            _type: 'DateObject',
+            mostrarHora: () => now.toLocaleTimeString('pt-BR', options),
+            mostrarData: () => now.toLocaleDateString('pt-BR', options),
+            ano: () => localDate.getFullYear()
+        };
+    }
+
+    lerInput() {
+        const prompt = require('prompt-sync')({ sigint: true });
+        return prompt('');
     }
 }
 
 module.exports = Evaluator;
+

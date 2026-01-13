@@ -1,7 +1,9 @@
 class Token {
-    constructor(type, value) {
+    constructor(type, value, line, column) {
         this.type = type;
         this.value = value;
+        this.line = line;
+        this.column = column;
     }
 }
 
@@ -9,10 +11,19 @@ class Lexer {
     constructor(code) {
         this.code = code;
         this.pos = 0;
-        this.currentChar = this.code[this.pos];
+        this.line = 1;
+        this.column = 0;
+        this.currentChar = this.code[this.pos] || null;
     }
 
     advance() {
+        if (this.currentChar === '\n') {
+            this.line++;
+            this.column = 0;
+        } else {
+            this.column++;
+        }
+
         this.pos++;
         this.currentChar = this.pos < this.code.length ? this.code[this.pos] : null;
     }
@@ -28,50 +39,90 @@ class Lexer {
             while (this.currentChar && this.currentChar !== '\n') {
                 this.advance();
             }
+            this.advance(); // consome \n
         }
     }
 
     readNumber() {
         let num = '';
+        let dotCount = 0;
+        const startCol = this.column;
+
         while (this.currentChar && /[0-9.]/.test(this.currentChar)) {
+            if (this.currentChar === '.') {
+                dotCount++;
+                if (dotCount > 1) break;
+            }
             num += this.currentChar;
             this.advance();
         }
-        return parseFloat(num);
+
+        return new Token('NUMBER', parseFloat(num), this.line, startCol);
     }
 
     readString() {
         let str = '';
-        this.advance(); // pula a aspas inicial
-        
+        const startCol = this.column;
+        this.advance(); // pula "
+
         while (this.currentChar && this.currentChar !== '"') {
             str += this.currentChar;
             this.advance();
         }
-        
-        this.advance(); // pula a aspas final
-        return str;
+
+        if (this.currentChar !== '"') {
+            throw new Error(`String não finalizada (linha ${this.line})`);
+        }
+
+        this.advance(); // pula "
+        return new Token('STRING', str, this.line, startCol);
     }
 
     readIdentifier() {
         let id = '';
-        while (this.currentChar && /[a-záàãâéêíóôõúçA-Z_]/.test(this.currentChar)) {
+        const startCol = this.column;
+
+        while (this.currentChar && /[a-zA-Z_áàãâéêíóôõúç0-9]/i.test(this.currentChar)) {
             id += this.currentChar;
             this.advance();
         }
-        return id;
+
+        const keywords = {
+            'escreva': 'PRINT',
+            'variavel': 'VAR',
+            'se': 'IF',
+            'senao': 'ELSE',
+            'enquanto': 'WHILE',
+            'funcao': 'FUNCTION',
+            'retorna': 'RETURN',
+
+            // Operadores em palavras (sem conflito semântico)
+            'maior': 'KW_GT',
+            'menor': 'KW_LT',
+            'igual': 'KW_EQ',
+            'maiorIgual': 'KW_GTE',
+            'menorIgual': 'KW_LTE',
+            'mais': 'KW_PLUS',
+            'menos': 'KW_MINUS',
+            'vezes': 'KW_MULT',
+            'dividido': 'KW_DIV'
+        };
+
+        const type = keywords[id] || 'IDENTIFIER';
+        return new Token(type, id, this.line, startCol);
     }
 
     tokenize() {
         const tokens = [];
 
-        while (this.currentChar) {
-            // Ignora espaços e comentários
+        while (this.currentChar !== null) {
+            // Espaços
             if (/\s/.test(this.currentChar)) {
                 this.skipWhitespace();
                 continue;
             }
 
+            // Comentários
             if (this.currentChar === '#') {
                 this.skipComment();
                 continue;
@@ -79,84 +130,38 @@ class Lexer {
 
             // Números
             if (/[0-9]/.test(this.currentChar)) {
-                tokens.push(new Token('NUMBER', this.readNumber()));
+                tokens.push(this.readNumber());
                 continue;
             }
 
             // Strings
             if (this.currentChar === '"') {
-                tokens.push(new Token('STRING', this.readString()));
+                tokens.push(this.readString());
                 continue;
             }
 
-            // Operadores
-            if (this.currentChar === '+') {
-                tokens.push(new Token('PLUS', '+'));
-                this.advance();
-                continue;
-            }
+            const line = this.line;
+            const col = this.column;
 
-            if (this.currentChar === '-') {
-                tokens.push(new Token('MINUS', '-'));
-                this.advance();
-                continue;
-            }
-
-            if (this.currentChar === '*') {
-                tokens.push(new Token('MULTIPLY', '*'));
-                this.advance();
-                continue;
-            }
-
-            if (this.currentChar === '/') {
-                tokens.push(new Token('DIVIDE', '/'));
-                this.advance();
-                continue;
-            }
-
-            if (this.currentChar === '(') {
-                tokens.push(new Token('LPAREN', '('));
-                this.advance();
-                continue;
-            }
-
-            if (this.currentChar === ')') {
-                tokens.push(new Token('RPAREN', ')'));
-                this.advance();
-                continue;
-            }
-
+            // Operadores compostos
             if (this.currentChar === '=') {
-                tokens.push(new Token('EQUALS', '='));
                 this.advance();
-                continue;
-            }
-
-            if (this.currentChar === ':') {
-                tokens.push(new Token('COLON', ':'));
-                this.advance();
-                continue;
-            }
-
-            if (this.currentChar === ',') {
-                tokens.push(new Token('COMMA', ','));
-                this.advance();
-                continue;
-            }
-
-            if (this.currentChar === '.') {
-                tokens.push(new Token('DOT', '.'));
-                this.advance();
+                if (this.currentChar === '=') {
+                    this.advance();
+                    tokens.push(new Token('EQ', '==', line, col));
+                } else {
+                    tokens.push(new Token('ASSIGN', '=', line, col));
+                }
                 continue;
             }
 
             if (this.currentChar === '>') {
                 this.advance();
                 if (this.currentChar === '=') {
-                    tokens.push(new Token('GREATER_EQUAL', '>='));
                     this.advance();
+                    tokens.push(new Token('GTE', '>=', line, col));
                 } else {
-                    tokens.push(new Token('GREATER', '>'));
+                    tokens.push(new Token('GT', '>', line, col));
                 }
                 continue;
             }
@@ -164,47 +169,46 @@ class Lexer {
             if (this.currentChar === '<') {
                 this.advance();
                 if (this.currentChar === '=') {
-                    tokens.push(new Token('LESS_EQUAL', '<='));
                     this.advance();
+                    tokens.push(new Token('LTE', '<=', line, col));
                 } else {
-                    tokens.push(new Token('LESS', '<'));
+                    tokens.push(new Token('LT', '<', line, col));
                 }
                 continue;
             }
 
-            // Palavras-chave e identificadores
-            if (/[a-záàãâéêíóôõúçA-Z_]/.test(this.currentChar)) {
-                const id = this.readIdentifier();
-                
-                // Palavras-chave em português
-                const keywords = {
-                    'escreva': 'PRINT',
-                    'variavel': 'VAR',
-                    'se': 'IF',
-                    'senao': 'ELSE',
-                    'enquanto': 'WHILE',
-                    'funcao': 'FUNCTION',
-                    'retorna': 'RETURN',
-                    'maior': 'GREATER',
-                    'menor': 'LESS',
-                    'igual': 'EQUALS_COMP',
-                    'maiorIgual': 'GREATER_EQUAL',
-                    'menorIgual': 'LESS_EQUAL',
-                    'mais': 'PLUS',
-                    'menos': 'MINUS',
-                    'vezes': 'MULTIPLY',
-                    'dividido': 'DIVIDE'
-                };
+            // Símbolos simples
+            const symbols = {
+                '+': 'PLUS',
+                '-': 'MINUS',
+                '*': 'MULT',
+                '/': 'DIV',
+                '(': 'LPAREN',
+                ')': 'RPAREN',
+                ':': 'COLON',
+                ',': 'COMMA',
+                '.': 'DOT'
+            };
 
-                const tokenType = keywords[id] || 'IDENTIFIER';
-                tokens.push(new Token(tokenType, id));
+            if (symbols[this.currentChar]) {
+                const char = this.currentChar;
+                this.advance();
+                tokens.push(new Token(symbols[char], char, line, col));
                 continue;
             }
 
-            throw new Error(`Caractere inválido: ${this.currentChar}`);
+            // Identificadores / palavras-chave
+            if (/[a-zA-Z_áàãâéêíóôõúç]/i.test(this.currentChar)) {
+                tokens.push(this.readIdentifier());
+                continue;
+            }
+
+            throw new Error(
+                `Caractere inválido '${this.currentChar}' na linha ${this.line}, coluna ${this.column}`
+            );
         }
 
-        tokens.push(new Token('EOF', null));
+        tokens.push(new Token('EOF', null, this.line, this.column));
         return tokens;
     }
 }
