@@ -95,6 +95,7 @@ class Lexer {
             'enquanto': 'WHILE',
             'funcao': 'FUNCTION',
             'retorna': 'RETURN',
+            'fim': 'END',  // ← ADICIONADO!
 
             // Operadores em palavras (sem conflito semântico)
             'maior': 'KW_GT',

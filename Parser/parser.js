@@ -12,16 +12,44 @@ class Parser {
 
     expect(type) {
         if (!this.currentToken) {
-            throw new Error(`Fim inesperado do código, esperado ${type}`);
+            throw new Error(`❌ Fim inesperado do código. Esperava ${this.translateToken(type)}.`);
         }
         if (this.currentToken.type !== type) {
             throw new Error(
-                `Esperado ${type}, mas encontrado ${this.currentToken.type}`
+                `❌ Erro na linha ${this.currentToken.line}, coluna ${this.currentToken.column}:\n` +
+                `   Esperado ${this.translateToken(type)}, mas encontrado ${this.translateToken(this.currentToken.type)}\n` +
+                `   ${this.getHint(type)}`
             );
         }
         const token = this.currentToken;
         this.advance();
         return token;
+    }
+
+    translateToken(type) {
+        const translations = {
+            'END': '"fim"',
+            'COLON': '":"',
+            'LPAREN': '"("',
+            'RPAREN': '")"',
+            'IF': '"se"',
+            'ELSE': '"senao"',
+            'WHILE': '"enquanto"',
+            'FUNCTION': '"funcao"',
+            'PRINT': '"escreva"',
+            'VAR': '"variavel"',
+            'RETURN': '"retorna"',
+        };
+        return translations[type] || type;
+    }
+
+    getHint(type) {
+        const hints = {
+            'END': '💡 Dica: Você esqueceu de fechar o bloco com "fim"?',
+            'COLON': '💡 Dica: Você esqueceu de colocar ":" depois da condição?',
+            'RPAREN': '💡 Dica: Você esqueceu de fechar o parêntese ")"?',
+        };
+        return hints[type] || '';
     }
 
     parse() {
@@ -45,6 +73,9 @@ class Parser {
             case 'IF':
                 return this.ifStatement();
 
+            case 'WHILE':
+                return this.whileStatement();
+
             case 'FUNCTION':
                 return this.functionDeclaration();
 
@@ -52,7 +83,10 @@ class Parser {
                 return this.returnStatement();
 
             default:
-                throw new Error(`Statement inválido: ${this.currentToken.type}`);
+                throw new Error(
+                    `❌ Erro na linha ${this.currentToken.line}: ` +
+                    `Statement inválido: ${this.currentToken.type}`
+                );
         }
     }
 
@@ -73,6 +107,10 @@ class Parser {
     }
 
     // se condicao:
+    //   body
+    // senao:
+    //   elseBody
+    // fim
     ifStatement() {
         this.advance(); // IF
         const condition = this.comparison();
@@ -81,7 +119,7 @@ class Parser {
         const body = [];
         while (
             this.currentToken &&
-            !['ELSE', 'EOF'].includes(this.currentToken.type)
+            !['ELSE', 'END', 'EOF'].includes(this.currentToken.type)
         ) {
             body.push(this.statement());
         }
@@ -95,16 +133,43 @@ class Parser {
 
             while (
                 this.currentToken &&
+                this.currentToken.type !== 'END' &&
                 this.currentToken.type !== 'EOF'
             ) {
                 elseBody.push(this.statement());
             }
         }
 
+        this.expect('END'); // ← EXIGE FIM!
+
         return { type: 'If', condition, body, elseBody };
     }
 
+    // enquanto condicao:
+    //   body
+    // fim
+    whileStatement() {
+        this.advance(); // WHILE
+        const condition = this.comparison();
+        this.expect('COLON');
+
+        const body = [];
+        while (
+            this.currentToken &&
+            this.currentToken.type !== 'END' &&
+            this.currentToken.type !== 'EOF'
+        ) {
+            body.push(this.statement());
+        }
+
+        this.expect('END'); // ← EXIGE FIM!
+
+        return { type: 'While', condition, body };
+    }
+
     // funcao nome(a, b):
+    //   body
+    // fim
     functionDeclaration() {
         this.advance(); // FUNCTION
         const name = this.expect('IDENTIFIER').value;
@@ -124,10 +189,13 @@ class Parser {
         const body = [];
         while (
             this.currentToken &&
+            this.currentToken.type !== 'END' &&
             this.currentToken.type !== 'EOF'
         ) {
             body.push(this.statement());
         }
+
+        this.expect('END'); // ← EXIGE FIM!
 
         return { type: 'FunctionDeclaration', name, params, body };
     }
@@ -194,7 +262,7 @@ class Parser {
         const token = this.currentToken;
 
         if (!token) {
-            throw new Error('Expressão incompleta');
+            throw new Error('❌ Expressão incompleta');
         }
 
         // Número
@@ -264,7 +332,10 @@ class Parser {
             return expr;
         }
 
-        throw new Error(`Token inesperado: ${token.type}`);
+        throw new Error(
+            `❌ Erro na linha ${token.line}, coluna ${token.column}: ` +
+            `Token inesperado: ${token.type}`
+        );
     }
 }
 
