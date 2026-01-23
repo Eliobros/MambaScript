@@ -32,6 +32,8 @@ class Parser {
             'COLON': '":"',
             'LPAREN': '"("',
             'RPAREN': '")"',
+            'LBRACKET': '"["',
+            'RBRACKET': '"]"',
             'IF': '"se"',
             'ELSE': '"senao"',
             'WHILE': '"enquanto"',
@@ -48,17 +50,16 @@ class Parser {
             'END': '💡 Dica: Você esqueceu de fechar o bloco com "fim"?',
             'COLON': '💡 Dica: Você esqueceu de colocar ":" depois da condição?',
             'RPAREN': '💡 Dica: Você esqueceu de fechar o parêntese ")"?',
+            'RBRACKET': '💡 Dica: Você esqueceu de fechar o colchete "]"?',
         };
         return hints[type] || '';
     }
 
     parse() {
         const statements = [];
-
         while (this.currentToken && this.currentToken.type !== 'EOF') {
             statements.push(this.statement());
         }
-
         return { type: 'Program', body: statements };
     }
 
@@ -66,22 +67,18 @@ class Parser {
         switch (this.currentToken.type) {
             case 'PRINT':
                 return this.printStatement();
-
             case 'VAR':
                 return this.varStatement();
-
             case 'IF':
                 return this.ifStatement();
-
             case 'WHILE':
                 return this.whileStatement();
-
             case 'FUNCTION':
                 return this.functionDeclaration();
-
             case 'RETURN':
                 return this.returnStatement();
-
+	    case 'IDENTIFIER':
+            return this.assignmentStatement
             default:
                 throw new Error(
                     `❌ Erro na linha ${this.currentToken.line}: ` +
@@ -90,29 +87,22 @@ class Parser {
         }
     }
 
-    // escreva expr
     printStatement() {
-        this.advance(); // PRINT
+        this.advance();
         const value = this.expression();
         return { type: 'Print', value };
     }
 
-    // variavel x = expr
     varStatement() {
-        this.advance(); // VAR
+        this.advance();
         const name = this.expect('IDENTIFIER').value;
         this.expect('ASSIGN');
         const value = this.expression();
         return { type: 'VarDeclaration', name, value };
     }
 
-    // se condicao:
-    //   body
-    // senao:
-    //   elseBody
-    // fim
     ifStatement() {
-        this.advance(); // IF
+        this.advance();
         const condition = this.comparison();
         this.expect('COLON');
 
@@ -127,7 +117,7 @@ class Parser {
         let elseBody = null;
 
         if (this.currentToken && this.currentToken.type === 'ELSE') {
-            this.advance(); // ELSE
+            this.advance();
             this.expect('COLON');
             elseBody = [];
 
@@ -140,16 +130,13 @@ class Parser {
             }
         }
 
-        this.expect('END'); // ← EXIGE FIM!
+        this.expect('END');
 
         return { type: 'If', condition, body, elseBody };
     }
 
-    // enquanto condicao:
-    //   body
-    // fim
     whileStatement() {
-        this.advance(); // WHILE
+        this.advance();
         const condition = this.comparison();
         this.expect('COLON');
 
@@ -162,16 +149,13 @@ class Parser {
             body.push(this.statement());
         }
 
-        this.expect('END'); // ← EXIGE FIM!
+        this.expect('END');
 
         return { type: 'While', condition, body };
     }
 
-    // funcao nome(a, b):
-    //   body
-    // fim
     functionDeclaration() {
-        this.advance(); // FUNCTION
+        this.advance();
         const name = this.expect('IDENTIFIER').value;
         this.expect('LPAREN');
 
@@ -195,19 +179,24 @@ class Parser {
             body.push(this.statement());
         }
 
-        this.expect('END'); // ← EXIGE FIM!
+        this.expect('END');
 
         return { type: 'FunctionDeclaration', name, params, body };
     }
 
-    // retorna expr
     returnStatement() {
-        this.advance(); // RETURN
+        this.advance();
         const value = this.expression();
         return { type: 'Return', value };
     }
 
-    // expr (GT | LT | EQ | GTE | LTE) expr
+    assignmentStatement() {
+    const name = this.expect('IDENTIFIER').value;
+    this.expect('ASSIGN');
+    const value = this.expression();
+    return { type: 'Assignment', name, value };
+}
+
     comparison() {
         let left = this.expression();
 
@@ -224,7 +213,6 @@ class Parser {
         return left;
     }
 
-    // soma / sub
     expression() {
         let result = this.term();
 
@@ -241,7 +229,6 @@ class Parser {
         return result;
     }
 
-    // mult / div
     term() {
         let result = this.factor();
 
@@ -265,24 +252,26 @@ class Parser {
             throw new Error('❌ Expressão incompleta');
         }
 
-        // Número
         if (token.type === 'NUMBER') {
             this.advance();
             return { type: 'Number', value: token.value };
         }
 
-        // String
         if (token.type === 'STRING') {
             this.advance();
             return { type: 'String', value: token.value };
         }
 
-        // Identificador / função / método
+        // ARRAY LITERAL
+        if (token.type === 'LBRACKET') {
+            return this.arrayLiteral();
+        }
+
         if (token.type === 'IDENTIFIER') {
             let result = { type: 'Identifier', name: token.value };
             this.advance();
 
-            // Chamada de função
+            // Function call
             if (this.currentToken && this.currentToken.type === 'LPAREN') {
                 this.advance();
                 const args = [];
@@ -298,9 +287,17 @@ class Parser {
                 result = { type: 'FunctionCall', name: result.name, args };
             }
 
-            // Encadeamento de métodos
+            // ARRAY ACCESS
+            if (this.currentToken && this.currentToken.type === 'LBRACKET') {
+                this.advance();
+                const index = this.expression();
+                this.expect('RBRACKET');
+                result = { type: 'ArrayAccess', array: result, index };
+            }
+
+            // Method chaining
             while (this.currentToken && this.currentToken.type === 'DOT') {
-                this.advance(); // DOT
+                this.advance();
                 const method = this.expect('IDENTIFIER').value;
                 this.expect('LPAREN');
 
@@ -324,7 +321,6 @@ class Parser {
             return result;
         }
 
-        // (expr)
         if (token.type === 'LPAREN') {
             this.advance();
             const expr = this.expression();
@@ -336,6 +332,23 @@ class Parser {
             `❌ Erro na linha ${token.line}, coluna ${token.column}: ` +
             `Token inesperado: ${token.type}`
         );
+    }
+
+    // NOVO: Parse array literal [1, 2, 3]
+    arrayLiteral() {
+        this.expect('LBRACKET');
+        const elements = [];
+
+        while (this.currentToken && this.currentToken.type !== 'RBRACKET') {
+            elements.push(this.expression());
+            if (this.currentToken.type === 'COMMA') {
+                this.advance();
+            }
+        }
+
+        this.expect('RBRACKET');
+
+        return { type: 'ArrayLiteral', elements };
     }
 }
 

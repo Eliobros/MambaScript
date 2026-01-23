@@ -39,7 +39,7 @@ class Lexer {
             while (this.currentChar && this.currentChar !== '\n') {
                 this.advance();
             }
-            this.advance(); // consome \n
+            this.advance();
         }
     }
 
@@ -63,7 +63,7 @@ class Lexer {
     readString() {
         let str = '';
         const startCol = this.column;
-        this.advance(); // pula "
+        this.advance();
 
         while (this.currentChar && this.currentChar !== '"') {
             str += this.currentChar;
@@ -74,7 +74,7 @@ class Lexer {
             throw new Error(`String não finalizada (linha ${this.line})`);
         }
 
-        this.advance(); // pula "
+        this.advance();
         return new Token('STRING', str, this.line, startCol);
     }
 
@@ -95,9 +95,7 @@ class Lexer {
             'enquanto': 'WHILE',
             'funcao': 'FUNCTION',
             'retorna': 'RETURN',
-            'fim': 'END',  // ← ADICIONADO!
-
-            // Operadores em palavras (sem conflito semântico)
+            'fim': 'END',
             'maior': 'KW_GT',
             'menor': 'KW_LT',
             'igual': 'KW_EQ',
@@ -117,25 +115,21 @@ class Lexer {
         const tokens = [];
 
         while (this.currentChar !== null) {
-            // Espaços
             if (/\s/.test(this.currentChar)) {
                 this.skipWhitespace();
                 continue;
             }
 
-            // Comentários
             if (this.currentChar === '#') {
                 this.skipComment();
                 continue;
             }
 
-            // Números
             if (/[0-9]/.test(this.currentChar)) {
                 tokens.push(this.readNumber());
                 continue;
             }
 
-            // Strings
             if (this.currentChar === '"') {
                 tokens.push(this.readString());
                 continue;
@@ -144,7 +138,6 @@ class Lexer {
             const line = this.line;
             const col = this.column;
 
-            // Operadores compostos
             if (this.currentChar === '=') {
                 this.advance();
                 if (this.currentChar === '=') {
@@ -178,7 +171,6 @@ class Lexer {
                 continue;
             }
 
-            // Símbolos simples
             const symbols = {
                 '+': 'PLUS',
                 '-': 'MINUS',
@@ -186,6 +178,8 @@ class Lexer {
                 '/': 'DIV',
                 '(': 'LPAREN',
                 ')': 'RPAREN',
+                '[': 'LBRACKET',
+                ']': 'RBRACKET',
                 ':': 'COLON',
                 ',': 'COMMA',
                 '.': 'DOT'
@@ -198,7 +192,6 @@ class Lexer {
                 continue;
             }
 
-            // Identificadores / palavras-chave
             if (/[a-zA-Z_áàãâéêíóôõúç]/i.test(this.currentChar)) {
                 tokens.push(this.readIdentifier());
                 continue;

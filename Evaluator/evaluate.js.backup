@@ -31,13 +31,6 @@ class Evaluator {
                 this.variables[node.name] = varValue;
                 break;
 
-	    case 'Assignment':
-            if (!(node.name in this.variables)) {
-                throw new Error(`Variável não definida: ${node.name}`);
-            }
-            this.variables[node.name] = this.evaluate(node.value);
-            break;
-
             case 'If':
                 if (this.evaluate(node.condition)) {
                     for (const stmt of node.body) {
@@ -46,15 +39,6 @@ class Evaluator {
                     }
                 } else if (node.elseBody) {
                     for (const stmt of node.elseBody) {
-                        this.executeStatement(stmt);
-                        if (this.returnValue !== null) return;
-                    }
-                }
-                break;
-
-            case 'While':
-                while (this.evaluate(node.condition)) {
-                    for (const stmt of node.body) {
                         this.executeStatement(stmt);
                         if (this.returnValue !== null) return;
                     }
@@ -81,11 +65,8 @@ class Evaluator {
         if (!node) throw new Error('Nó inválido');
 
         switch (node.type) {
-            case 'Number': 
-                return node.value;
-            
-            case 'String': 
-                return node.value;
+            case 'Number': return node.value;
+            case 'String': return node.value;
 
             case 'Identifier':
                 if (!(node.name in this.variables)) {
@@ -93,77 +74,45 @@ class Evaluator {
                 }
                 return this.variables[node.name];
 
-            case 'ArrayLiteral':
-                return node.elements.map(el => this.evaluate(el));
-
-            case 'ArrayAccess':
-                const array = this.evaluate(node.array);
-                const index = this.evaluate(node.index);
-                
-                if (!Array.isArray(array)) {
-                    throw new Error('Tentativa de acessar índice em não-array');
-                }
-                if (typeof index !== 'number') {
-                    throw new Error('Índice deve ser um número');
-                }
-                if (index < 0 || index >= array.length) {
-                    throw new Error(`Índice ${index} fora dos limites (tamanho: ${array.length})`);
-                }
-                
-                return array[index];
-
             case 'BinaryOp':
                 const left = this.evaluate(node.left);
                 const right = this.evaluate(node.right);
 
                 if (node.operator === 'PLUS') {
+                    // SOMA: Ambos precisam ser números
                     if (typeof left === 'number' && typeof right === 'number') {
                         return left + right;
                     }
+                    // CONCATENAÇÃO: Ambos precisam ser strings
                     if (typeof left === 'string' && typeof right === 'string') {
                         return left + right;
                     }
+                    // ERRO: Tipos misturados
                     throw new Error(`Erro de Tipo: Não é possível somar ${typeof left} com ${typeof right}. Use .paraTexto() ou .paraNumero().`);
                 }
 
+                // Outras operações aritméticas (sempre esperam números)
                 if (typeof left !== 'number' || typeof right !== 'number') {
                     throw new Error(`Operação ${node.operator} permitida apenas entre números.`);
                 }
 
                 switch (node.operator) {
                     case 'MINUS': return left - right;
-                    case 'MULT': return left * right;
-                    case 'DIV': return left / right;
+                    case 'MULTIPLY': return left * right;
+                    case 'DIVIDE': return left / right;
                     default: throw new Error(`Operador desconhecido: ${node.operator}`);
                 }
 
             case 'Comparison':
                 const leftComp = this.evaluate(node.left);
                 const rightComp = this.evaluate(node.right);
-                
                 switch (node.operator) {
-                    case 'GT':
-                    case 'GREATER':
-                        return leftComp > rightComp;
-                    
-                    case 'LT':
-                    case 'LESS':
-                        return leftComp < rightComp;
-                    
-                    case 'EQ':
-                    case 'EQUALS_COMP':
-                        return leftComp === rightComp;
-                    
-                    case 'GTE':
-                    case 'GREATER_EQUAL':
-                        return leftComp >= rightComp;
-                    
-                    case 'LTE':
-                    case 'LESS_EQUAL':
-                        return leftComp <= rightComp;
-                    
-                    default:
-                        throw new Error(`Comparação desconhecida: ${node.operator}`);
+                    case 'GREATER': return leftComp > rightComp;
+                    case 'LESS': return leftComp < rightComp;
+                    case 'EQUALS_COMP': return leftComp === rightComp;
+                    case 'GREATER_EQUAL': return leftComp >= rightComp;
+                    case 'LESS_EQUAL': return leftComp <= rightComp;
+                    default: throw new Error(`Comparação desconhecida: ${node.operator}`);
                 }
 
             case 'FunctionCall':
@@ -201,73 +150,21 @@ class Evaluator {
     }
 
     callMethod(obj, methodName, args) {
-        // STRING METHODS
+        // --- TRATAMENTO DE TIPOS PRIMITIVOS (Bridge) ---
         if (typeof obj === 'string') {
             if (methodName === 'paraNumero') {
                 const n = Number(obj);
-                if (isNaN(n)) throw new Error(`❌ Erro MambaScript: "${obj}" não é um número válido.`);
+                if (isNaN(n)) throw new Error(`"${obj}" não é um número válido.`);
                 return n;
             }
-            if (methodName === 'tamanho') {
-                return obj.length;
-            }
-            if (methodName === 'maiuscula') {
-                return obj.toUpperCase();
-            }
-            if (methodName === 'minuscula') {
-                return obj.toLowerCase();
-            }
         }
-
-        // NUMBER METHODS
         if (typeof obj === 'number') {
             if (methodName === 'paraTexto') {
                 return String(obj);
             }
         }
 
-        // ARRAY METHODS
-        if (Array.isArray(obj)) {
-            if (methodName === 'tamanho') {
-                return obj.length;
-            }
-            if (methodName === 'adicionar') {
-                const item = this.evaluate(args[0]);
-                obj.push(item);
-                return undefined;
-            }
-            if (methodName === 'remover') {
-                const index = this.evaluate(args[0]);
-                if (typeof index !== 'number') {
-                    throw new Error('Índice deve ser um número');
-                }
-                if (index < 0 || index >= obj.length) {
-                    throw new Error(`Índice ${index} fora dos limites`);
-                }
-                obj.splice(index, 1);
-                return undefined;
-            }
-            if (methodName === 'pegar') {
-                const index = this.evaluate(args[0]);
-                if (typeof index !== 'number') {
-                    throw new Error('Índice deve ser um número');
-                }
-                if (index < 0 || index >= obj.length) {
-                    throw new Error(`Índice ${index} fora dos limites`);
-                }
-                return obj[index];
-            }
-            if (methodName === 'contem') {
-                const item = this.evaluate(args[0]);
-                return obj.includes(item);
-            }
-            if (methodName === 'juntar') {
-                const separator = args[0] ? this.evaluate(args[0]) : ',';
-                return obj.join(separator);
-            }
-        }
-
-        // DATEOBJECT METHODS
+        // --- TRATAMENTO DE OBJETOS (como DateObject) ---
         if (!obj || typeof obj !== 'object') {
             throw new Error(`O valor do tipo ${typeof obj} não possui o método "${methodName}"`);
         }
@@ -308,3 +205,4 @@ class Evaluator {
 }
 
 module.exports = Evaluator;
+
