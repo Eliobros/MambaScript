@@ -79,40 +79,53 @@ class Evaluator {
                 const right = this.evaluate(node.right);
 
                 if (node.operator === 'PLUS') {
-                    // SOMA: Ambos precisam ser números
                     if (typeof left === 'number' && typeof right === 'number') {
                         return left + right;
                     }
-                    // CONCATENAÇÃO: Ambos precisam ser strings
                     if (typeof left === 'string' && typeof right === 'string') {
                         return left + right;
                     }
-                    // ERRO: Tipos misturados
                     throw new Error(`Erro de Tipo: Não é possível somar ${typeof left} com ${typeof right}. Use .paraTexto() ou .paraNumero().`);
                 }
 
-                // Outras operações aritméticas (sempre esperam números)
                 if (typeof left !== 'number' || typeof right !== 'number') {
                     throw new Error(`Operação ${node.operator} permitida apenas entre números.`);
                 }
 
                 switch (node.operator) {
                     case 'MINUS': return left - right;
-                    case 'MULTIPLY': return left * right;
-                    case 'DIVIDE': return left / right;
+                    case 'MULT': return left * right;
+                    case 'DIV': return left / right;
                     default: throw new Error(`Operador desconhecido: ${node.operator}`);
                 }
 
             case 'Comparison':
                 const leftComp = this.evaluate(node.left);
                 const rightComp = this.evaluate(node.right);
+                
                 switch (node.operator) {
-                    case 'GREATER': return leftComp > rightComp;
-                    case 'LESS': return leftComp < rightComp;
-                    case 'EQUALS_COMP': return leftComp === rightComp;
-                    case 'GREATER_EQUAL': return leftComp >= rightComp;
-                    case 'LESS_EQUAL': return leftComp <= rightComp;
-                    default: throw new Error(`Comparação desconhecida: ${node.operator}`);
+                    case 'GT':
+                    case 'GREATER':
+                        return leftComp > rightComp;
+                    
+                    case 'LT':
+                    case 'LESS':
+                        return leftComp < rightComp;
+                    
+                    case 'EQ':
+                    case 'EQUALS_COMP':
+                        return leftComp === rightComp;
+                    
+                    case 'GTE':
+                    case 'GREATER_EQUAL':
+                        return leftComp >= rightComp;
+                    
+                    case 'LTE':
+                    case 'LESS_EQUAL':
+                        return leftComp <= rightComp;
+                    
+                    default:
+                        throw new Error(`Comparação desconhecida: ${node.operator}`);
                 }
 
             case 'FunctionCall':
@@ -150,11 +163,10 @@ class Evaluator {
     }
 
     callMethod(obj, methodName, args) {
-        // --- TRATAMENTO DE TIPOS PRIMITIVOS (Bridge) ---
         if (typeof obj === 'string') {
             if (methodName === 'paraNumero') {
                 const n = Number(obj);
-                if (isNaN(n)) throw new Error(`"${obj}" não é um número válido.`);
+                if (isNaN(n)) throw new Error(`❌ Erro MambaScript: "${obj}" não é um número válido.`);
                 return n;
             }
         }
@@ -164,7 +176,6 @@ class Evaluator {
             }
         }
 
-        // --- TRATAMENTO DE OBJETOS (como DateObject) ---
         if (!obj || typeof obj !== 'object') {
             throw new Error(`O valor do tipo ${typeof obj} não possui o método "${methodName}"`);
         }
@@ -205,4 +216,3 @@ class Evaluator {
 }
 
 module.exports = Evaluator;
-
