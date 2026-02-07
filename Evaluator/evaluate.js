@@ -5,7 +5,10 @@ class Evaluator {
         this.returnValue = null;
         this.builtinFunctions = {
             'hoje': this.createDateObject.bind(this),
-            'ler': this.lerInput.bind(this)
+            'ler': this.lerInput.bind(this),
+            'json_ler': this.jsonLer.bind(this),
+            'json_texto': this.jsonTexto.bind(this),
+            'json_escrever': this.jsonEscrever.bind(this)
         };
     }
 
@@ -31,12 +34,30 @@ class Evaluator {
                 this.variables[node.name] = varValue;
                 break;
 
-	    case 'Assignment':
-            if (!(node.name in this.variables)) {
-                throw new Error(`Variável não definida: ${node.name}`);
-            }
-            this.variables[node.name] = this.evaluate(node.value);
-            break;
+            case 'Assignment':
+                // Atribuição simples (variável)
+                if (typeof node.name === 'string') {
+                    if (!(node.name in this.variables)) {
+                        throw new Error(`Variável não definida: ${node.name}`);
+                    }
+                    this.variables[node.name] = this.evaluate(node.value);
+                } 
+                // Atribuição em propriedade (dados.nome = "João")
+                else if (node.name.type === 'PropertyAccess') {
+                    const obj = this.evaluate(node.name.object);
+                    if (typeof obj !== 'object' || obj === null) {
+                        throw new Error('Tentativa de atribuir propriedade em não-objeto');
+                    }
+                    obj[node.name.property] = this.evaluate(node.value);
+                }
+                // Atribuição para Identifier (compatibilidade)
+                else if (node.name.type === 'Identifier') {
+                    if (!(node.name.name in this.variables)) {
+                        throw new Error(`Variável não definida: ${node.name.name}`);
+                    }
+                    this.variables[node.name.name] = this.evaluate(node.value);
+                }
+                break;
 
             case 'If':
                 if (this.evaluate(node.condition)) {
@@ -72,6 +93,10 @@ class Evaluator {
                 this.returnValue = this.evaluate(node.value);
                 break;
 
+	    case 'ExpressionStatement':
+    this.evaluate(node.expression);
+    break
+
             default:
                 throw new Error(`Statement desconhecido: ${node.type}`);
         }
@@ -81,10 +106,10 @@ class Evaluator {
         if (!node) throw new Error('Nó inválido');
 
         switch (node.type) {
-            case 'Number': 
+            case 'Number':
                 return node.value;
-            
-            case 'String': 
+
+            case 'String':
                 return node.value;
 
             case 'Identifier':
@@ -99,7 +124,7 @@ class Evaluator {
             case 'ArrayAccess':
                 const array = this.evaluate(node.array);
                 const index = this.evaluate(node.index);
-                
+
                 if (!Array.isArray(array)) {
                     throw new Error('Tentativa de acessar índice em não-array');
                 }
@@ -109,8 +134,25 @@ class Evaluator {
                 if (index < 0 || index >= array.length) {
                     throw new Error(`Índice ${index} fora dos limites (tamanho: ${array.length})`);
                 }
-                
+
                 return array[index];
+
+            case 'PropertyAccess':
+                const object = this.evaluate(node.object);
+                
+                if (object === null || object === undefined) {
+                    throw new Error(`Tentativa de acessar propriedade "${node.property}" em valor nulo`);
+                }
+                
+                // Se for objeto JavaScript (JSON)
+                if (typeof object === 'object' && !Array.isArray(object) && !object._type) {
+                    if (!(node.property in object)) {
+                        throw new Error(`Propriedade "${node.property}" não existe no objeto`);
+                    }
+                    return object[node.property];
+                }
+                
+                throw new Error(`O tipo ${typeof object} não possui propriedades acessíveis`);
 
             case 'BinaryOp':
                 const left = this.evaluate(node.left);
@@ -140,28 +182,28 @@ class Evaluator {
             case 'Comparison':
                 const leftComp = this.evaluate(node.left);
                 const rightComp = this.evaluate(node.right);
-                
+
                 switch (node.operator) {
                     case 'GT':
                     case 'GREATER':
                         return leftComp > rightComp;
-                    
+
                     case 'LT':
                     case 'LESS':
                         return leftComp < rightComp;
-                    
+
                     case 'EQ':
                     case 'EQUALS_COMP':
                         return leftComp === rightComp;
-                    
+
                     case 'GTE':
                     case 'GREATER_EQUAL':
                         return leftComp >= rightComp;
-                    
+
                     case 'LTE':
                     case 'LESS_EQUAL':
                         return leftComp <= rightComp;
-                    
+
                     default:
                         throw new Error(`Comparação desconhecida: ${node.operator}`);
                 }
@@ -305,6 +347,35 @@ class Evaluator {
         const prompt = require('prompt-sync')({ sigint: true });
         return prompt('');
     }
+
+    jsonLer(arquivo) {
+        const fs = require('fs');
+        try {
+            const conteudo = fs.readFileSync(arquivo, 'utf-8');
+            return JSON.parse(conteudo);
+        } catch (erro) {
+            throw new Error(`❌ Erro ao ler JSON: ${erro.message}`);
+        }
+    }
+
+    jsonTexto(textoJson) {
+        try {
+            return JSON.parse(textoJson);
+        } catch (erro) {
+            throw new Error(`❌ Erro ao parsear JSON: ${erro.message}`);
+        }
+    }
+
+    jsonEscrever(arquivo, dados) {
+        const fs = require('fs');
+        try {
+            fs.writeFileSync(arquivo, JSON.stringify(dados, null, 2), 'utf-8');
+            return undefined;
+        } catch (erro) {
+            throw new Error(`❌ Erro ao escrever JSON: ${erro.message}`);
+        }
+    }
 }
 
 module.exports = Evaluator;
+

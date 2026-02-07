@@ -60,22 +60,35 @@ class Lexer {
         return new Token('NUMBER', parseFloat(num), this.line, startCol);
     }
 
-    readString() {
+    readString(quoteType) {
         let str = '';
         const startCol = this.column;
-        this.advance();
+        const startLine = this.line;
+        this.advance(); // Pula a aspas de abertura
 
-        while (this.currentChar && this.currentChar !== '"') {
-            str += this.currentChar;
-            this.advance();
+        while (this.currentChar && this.currentChar !== quoteType) {
+            // Suporte a escape de aspas
+            if (this.currentChar === '\\' && this.peek() === quoteType) {
+                this.advance(); // Pula a barra
+                str += this.currentChar;
+                this.advance();
+            } else {
+                str += this.currentChar;
+                this.advance();
+            }
         }
 
-        if (this.currentChar !== '"') {
-            throw new Error(`String não finalizada (linha ${this.line})`);
+        if (this.currentChar !== quoteType) {
+            throw new Error(`String não finalizada (linha ${startLine}, coluna ${startCol})`);
         }
 
-        this.advance();
-        return new Token('STRING', str, this.line, startCol);
+        this.advance(); // Pula a aspas de fechamento
+        return new Token('STRING', str, startLine, startCol);
+    }
+
+    peek() {
+        const peekPos = this.pos + 1;
+        return peekPos < this.code.length ? this.code[peekPos] : null;
     }
 
     readIdentifier() {
@@ -130,8 +143,9 @@ class Lexer {
                 continue;
             }
 
-            if (this.currentChar === '"') {
-                tokens.push(this.readString());
+            // Suporte a aspas duplas e simples
+            if (this.currentChar === '"' || this.currentChar === "'") {
+                tokens.push(this.readString(this.currentChar));
                 continue;
             }
 
@@ -208,3 +222,4 @@ class Lexer {
 }
 
 module.exports = Lexer;
+

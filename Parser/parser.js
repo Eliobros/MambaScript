@@ -77,8 +77,33 @@ class Parser {
                 return this.functionDeclaration();
             case 'RETURN':
                 return this.returnStatement();
-	    case 'IDENTIFIER':
-            return this.assignmentStatement
+            case 'IDENTIFIER':
+    // Precisa olhar à frente para saber se é assignment ou function call
+    const savedPos = this.pos;
+    const savedToken = this.currentToken;
+    
+    const name = this.expect('IDENTIFIER').value;
+    
+    // Se o próximo token é ASSIGN, é uma atribuição
+    if (this.currentToken && this.currentToken.type === 'ASSIGN') {
+        // Volta e processa como assignment
+        this.pos = savedPos;
+        this.currentToken = savedToken;
+        return this.assignmentStatement();
+    }
+    
+    // Se o próximo token é DOT, pode ser atribuição de propriedade
+    if (this.currentToken && this.currentToken.type === 'DOT') {
+        this.pos = savedPos;
+        this.currentToken = savedToken;
+        return this.assignmentStatement();
+    }
+    
+    // Senão, é uma chamada de função ou expressão standalone
+    this.pos = savedPos;
+    this.currentToken = savedToken;
+    const expr = this.expression();
+    return { type: 'ExpressionStatement', expression: expr };
             default:
                 throw new Error(
                     `❌ Erro na linha ${this.currentToken.line}: ` +
@@ -191,11 +216,24 @@ class Parser {
     }
 
     assignmentStatement() {
-    const name = this.expect('IDENTIFIER').value;
-    this.expect('ASSIGN');
-    const value = this.expression();
-    return { type: 'Assignment', name, value };
-}
+        const name = this.expect('IDENTIFIER').value;
+        let target = { type: 'Identifier', name };
+        
+        // Suporta atribuição em propriedades: dados.nome = "João"
+        while (this.currentToken && this.currentToken.type === 'DOT') {
+            this.advance();
+            const property = this.expect('IDENTIFIER').value;
+            target = {
+                type: 'PropertyAccess',
+                object: target,
+                property
+            };
+        }
+        
+        this.expect('ASSIGN');
+        const value = this.expression();
+        return { type: 'Assignment', name: target, value };
+    }
 
     comparison() {
         let left = this.expression();
@@ -295,27 +333,39 @@ class Parser {
                 result = { type: 'ArrayAccess', array: result, index };
             }
 
-            // Method chaining
+            // Property access e Method chaining
             while (this.currentToken && this.currentToken.type === 'DOT') {
                 this.advance();
-                const method = this.expect('IDENTIFIER').value;
-                this.expect('LPAREN');
+                const propertyOrMethod = this.expect('IDENTIFIER').value;
+                
+                // Se tem parênteses, é um método
+                if (this.currentToken && this.currentToken.type === 'LPAREN') {
+                    this.advance();
+                    const args = [];
 
-                const args = [];
-                while (this.currentToken.type !== 'RPAREN') {
-                    args.push(this.expression());
-                    if (this.currentToken.type === 'COMMA') {
-                        this.advance();
+                    while (this.currentToken.type !== 'RPAREN') {
+                        args.push(this.expression());
+                        if (this.currentToken.type === 'COMMA') {
+                            this.advance();
+                        }
                     }
-                }
-                this.expect('RPAREN');
+                    this.expect('RPAREN');
 
-                result = {
-                    type: 'MethodCall',
-                    object: result,
-                    method,
-                    args
-                };
+                    result = {
+                        type: 'MethodCall',
+                        object: result,
+                        method: propertyOrMethod,
+                        args
+                    };
+                } 
+                // Se não tem parênteses, é uma propriedade
+                else {
+                    result = {
+                        type: 'PropertyAccess',
+                        object: result,
+                        property: propertyOrMethod
+                    };
+                }
             }
 
             return result;
@@ -353,3 +403,4 @@ class Parser {
 }
 
 module.exports = Parser;
+
