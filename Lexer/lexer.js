@@ -106,9 +106,19 @@ class Lexer {
             'se': 'IF',
             'senao': 'ELSE',
             'enquanto': 'WHILE',
+            'para': 'FOR',
+            'de': 'DE',
+            'ate': 'ATE',
             'funcao': 'FUNCTION',
             'retorna': 'RETURN',
             'fim': 'END',
+            'importar': 'IMPORT',
+            'e': 'AND',
+            'ou': 'OR',
+            'nao': 'NOT',
+            'verdadeiro': 'TRUE',
+            'falso': 'FALSE',
+            'nulo': 'NULL',
             'maior': 'KW_GT',
             'menor': 'KW_LT',
             'igual': 'KW_EQ',
@@ -194,6 +204,8 @@ class Lexer {
                 ')': 'RPAREN',
                 '[': 'LBRACKET',
                 ']': 'RBRACKET',
+                '{': 'LBRACE',      // ✅ NOVO
+                '}': 'RBRACE',      // ✅ NOVO
                 ':': 'COLON',
                 ',': 'COMMA',
                 '.': 'DOT'
@@ -222,4 +234,3 @@ class Lexer {
 }
 
 module.exports = Lexer;
-

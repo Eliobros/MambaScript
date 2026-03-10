@@ -44,7 +44,7 @@ try {
     const ast = parser.parse();
     
     // Evaluator
-    const evaluator = new Evaluator();
+    const evaluator = new Evaluator(fullPath);
     evaluator.execute(ast);
     
 } catch (error) {

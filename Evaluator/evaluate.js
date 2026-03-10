@@ -1,5 +1,6 @@
 class Evaluator {
-    constructor() {
+    constructor(filePath) {
+        this.filePath = filePath || process.cwd();
         this.variables = {};
         this.functions = {};
         this.returnValue = null;
@@ -9,6 +10,11 @@ class Evaluator {
             'json_ler': this.jsonLer.bind(this),
             'json_texto': this.jsonTexto.bind(this),
             'json_escrever': this.jsonEscrever.bind(this)
+        };
+        this.builtinModules = {
+            'fs': this.createFsModule(),
+            'matematica': this.createMathModule(),
+            'caminho': this.createPathModule()
         };
     }
 
@@ -93,9 +99,25 @@ class Evaluator {
                 this.returnValue = this.evaluate(node.value);
                 break;
 
-	    case 'ExpressionStatement':
-    this.evaluate(node.expression);
-    break
+            case 'For':
+                const startVal = this.evaluate(node.start);
+                const endVal = this.evaluate(node.end);
+                for (let i = startVal; i <= endVal; i++) {
+                    this.variables[node.varName] = i;
+                    for (const stmt of node.body) {
+                        this.executeStatement(stmt);
+                        if (this.returnValue !== null) return;
+                    }
+                }
+                break;
+
+            case 'Import':
+                this.executeImport(node);
+                break;
+
+            case 'ExpressionStatement':
+                this.evaluate(node.expression);
+                break;
 
             default:
                 throw new Error(`Statement desconhecido: ${node.type}`);
@@ -112,6 +134,12 @@ class Evaluator {
             case 'String':
                 return node.value;
 
+            case 'Boolean':
+                return node.value;
+
+            case 'Null':
+                return null;
+
             case 'Identifier':
                 if (!(node.name in this.variables)) {
                     throw new Error(`Variável não definida: ${node.name}`);
@@ -120,6 +148,14 @@ class Evaluator {
 
             case 'ArrayLiteral':
                 return node.elements.map(el => this.evaluate(el));
+
+            case 'ObjectLiteral':
+                const objectLiteral = {};
+                for (const [key, valueNode] of Object.entries(node.properties)) {
+                    objectLiteral[key] = this.evaluate(valueNode);
+                }
+                return objectLiteral;
+
 
             case 'ArrayAccess':
                 const array = this.evaluate(node.array);
@@ -232,6 +268,21 @@ class Evaluator {
                 this.returnValue = oldReturnValue;
                 this.variables = oldVars;
                 return result !== null ? result : undefined;
+
+            case 'LogicalOp':
+                if (node.operator === 'AND') {
+                    return this.evaluate(node.left) && this.evaluate(node.right);
+                }
+                if (node.operator === 'OR') {
+                    return this.evaluate(node.left) || this.evaluate(node.right);
+                }
+                throw new Error(`Operador lógico desconhecido: ${node.operator}`);
+
+            case 'UnaryOp':
+                if (node.operator === 'NOT') {
+                    return !this.evaluate(node.operand);
+                }
+                throw new Error(`Operador unário desconhecido: ${node.operator}`);
 
             case 'MethodCall':
                 const obj = this.evaluate(node.object);
@@ -374,6 +425,134 @@ class Evaluator {
         } catch (erro) {
             throw new Error(`❌ Erro ao escrever JSON: ${erro.message}`);
         }
+    }
+
+    executeImport(node) {
+        const { name, source } = node;
+
+        if (this.builtinModules[source]) {
+            this.variables[name] = this.builtinModules[source];
+            return;
+        }
+
+        const fs = require('fs');
+        const path = require('path');
+        const Lexer = require(path.join(__dirname, '..', 'Lexer', 'lexer'));
+        const Parser = require(path.join(__dirname, '..', 'Parser', 'parser'));
+
+        const baseDir = typeof this.filePath === 'string' && fs.existsSync(this.filePath) && fs.statSync(this.filePath).isFile()
+            ? path.dirname(this.filePath)
+            : this.filePath;
+
+        let resolvedPath = null;
+        const nomeNormalizado = source.endsWith('.ms') ? source : source + '.ms';
+
+const candidates = [
+    path.resolve(baseDir, nomeNormalizado),
+    path.resolve(baseDir, 'modulos_mambas', nomeNormalizado),
+    path.resolve(baseDir, 'modulos_mambas', source, 'index.ms'),
+];
+
+        for (const candidate of candidates) {
+            if (fs.existsSync(candidate)) {
+                resolvedPath = candidate;
+                break;
+            }
+        }
+
+        if (!resolvedPath) {
+            throw new Error(`❌ Módulo não encontrado: "${source}"\n   Procurado em:\n   - ${candidates.join('\n   - ')}`);
+        }
+
+        const code = fs.readFileSync(resolvedPath, 'utf-8');
+        const lexer = new Lexer(code);
+        const tokens = lexer.tokenize();
+        const parser = new Parser(tokens);
+        const ast = parser.parse();
+
+        const moduleEvaluator = new Evaluator(resolvedPath);
+        moduleEvaluator.execute(ast);
+
+        const moduleExports = {};
+        for (const [key, value] of Object.entries(moduleEvaluator.functions)) {
+            moduleExports[key] = (...args) => {
+                const evalCopy = new Evaluator(resolvedPath);
+                evalCopy.functions = { ...moduleEvaluator.functions };
+                evalCopy.variables = { ...moduleEvaluator.variables };
+                evalCopy.returnValue = null;
+
+                const func = evalCopy.functions[key];
+                for (let i = 0; i < func.params.length; i++) {
+                    evalCopy.variables[func.params[i]] = args[i];
+                }
+                for (const stmt of func.body) {
+                    evalCopy.executeStatement(stmt);
+                    if (evalCopy.returnValue !== null) break;
+                }
+                return evalCopy.returnValue;
+            };
+        }
+        for (const [key, value] of Object.entries(moduleEvaluator.variables)) {
+            moduleExports[key] = value;
+        }
+
+        this.variables[name] = moduleExports;
+    }
+
+    createFsModule() {
+        const fs = require('fs');
+        return {
+            ler: (arquivo) => {
+                try {
+                    return fs.readFileSync(arquivo, 'utf-8');
+                } catch (e) {
+                    throw new Error(`❌ Erro ao ler arquivo: ${e.message}`);
+                }
+            },
+            escrever: (arquivo, conteudo) => {
+                try {
+                    fs.writeFileSync(arquivo, conteudo, 'utf-8');
+                    return undefined;
+                } catch (e) {
+                    throw new Error(`❌ Erro ao escrever arquivo: ${e.message}`);
+                }
+            },
+            existe: (arquivo) => fs.existsSync(arquivo),
+            apagar: (arquivo) => {
+                try {
+                    fs.unlinkSync(arquivo);
+                    return undefined;
+                } catch (e) {
+                    throw new Error(`❌ Erro ao apagar arquivo: ${e.message}`);
+                }
+            }
+        };
+    }
+
+    createMathModule() {
+        return {
+            PI: Math.PI,
+            raiz: (n) => Math.sqrt(n),
+            potencia: (base, exp) => Math.pow(base, exp),
+            absoluto: (n) => Math.abs(n),
+            arredondar: (n) => Math.round(n),
+            teto: (n) => Math.ceil(n),
+            chao: (n) => Math.floor(n),
+            aleatorio: () => Math.random(),
+            seno: (n) => Math.sin(n),
+            cosseno: (n) => Math.cos(n)
+        };
+    }
+
+    createPathModule() {
+        const path = require('path');
+        return {
+            juntar: (...partes) => path.join(...partes),
+            diretorio: (caminho) => path.dirname(caminho),
+            arquivo: (caminho) => path.basename(caminho),
+            extensao: (caminho) => path.extname(caminho),
+            absoluto: (caminho) => path.resolve(caminho)
+        };
     }
 }
 

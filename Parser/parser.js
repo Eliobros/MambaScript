@@ -34,6 +34,9 @@ class Parser {
             'RPAREN': '")"',
             'LBRACKET': '"["',
             'RBRACKET': '"]"',
+            'LBRACE': '"{"',      // ✅ NOVO
+            'RBRACE': '"}"',      // ✅ NOVO
+            'COMMA': '","',       // ✅ NOVO
             'IF': '"se"',
             'ELSE': '"senao"',
             'WHILE': '"enquanto"',
@@ -51,6 +54,8 @@ class Parser {
             'COLON': '💡 Dica: Você esqueceu de colocar ":" depois da condição?',
             'RPAREN': '💡 Dica: Você esqueceu de fechar o parêntese ")"?',
             'RBRACKET': '💡 Dica: Você esqueceu de fechar o colchete "]"?',
+            'RBRACE': '💡 Dica: Você esqueceu de fechar a chave "}"?',    // ✅ NOVO
+            'COMMA': '💡 Dica: Você esqueceu de separar os itens com vírgula?',  // ✅ NOVO
         };
         return hints[type] || '';
     }
@@ -64,53 +69,71 @@ class Parser {
     }
 
     statement() {
-        switch (this.currentToken.type) {
-            case 'PRINT':
-                return this.printStatement();
-            case 'VAR':
-                return this.varStatement();
-            case 'IF':
-                return this.ifStatement();
-            case 'WHILE':
-                return this.whileStatement();
-            case 'FUNCTION':
-                return this.functionDeclaration();
-            case 'RETURN':
-                return this.returnStatement();
-            case 'IDENTIFIER':
-    // Precisa olhar à frente para saber se é assignment ou function call
-    const savedPos = this.pos;
-    const savedToken = this.currentToken;
-    
-    const name = this.expect('IDENTIFIER').value;
-    
-    // Se o próximo token é ASSIGN, é uma atribuição
-    if (this.currentToken && this.currentToken.type === 'ASSIGN') {
-        // Volta e processa como assignment
-        this.pos = savedPos;
-        this.currentToken = savedToken;
-        return this.assignmentStatement();
+    switch (this.currentToken.type) {
+        case 'PRINT':
+            return this.printStatement();
+        case 'VAR':
+            return this.varStatement();
+        case 'IF':
+            return this.ifStatement();
+        case 'WHILE':
+            return this.whileStatement();
+        case 'FOR':
+            return this.forStatement();
+        case 'FUNCTION':
+            return this.functionDeclaration();
+        case 'RETURN':
+            return this.returnStatement();
+        case 'IMPORT':
+            return this.importStatement();
+        case 'IDENTIFIER':
+            // ✅ ATUALIZADO - Detecta assignment vs method call
+            const savedPos = this.pos;
+            const savedToken = this.currentToken;
+
+            const name = this.expect('IDENTIFIER').value;
+
+            // Se o próximo token é ASSIGN, é uma atribuição
+            if (this.currentToken && this.currentToken.type === 'ASSIGN') {
+                this.pos = savedPos;
+                this.currentToken = savedToken;
+                return this.assignmentStatement();
+            }
+
+            // Se o próximo token é DOT, verificar se é atribuição ou method call
+            if (this.currentToken && this.currentToken.type === 'DOT') {
+                const dotPos = this.pos;
+                this.advance(); // Pular o DOT
+                
+                const propertyOrMethod = this.expect('IDENTIFIER').value;
+                
+                // Se depois do identificador tem ASSIGN, é atribuição
+                if (this.currentToken && this.currentToken.type === 'ASSIGN') {
+                    this.pos = savedPos;
+                    this.currentToken = savedToken;
+                    return this.assignmentStatement();
+                }
+                
+                // Se tem LPAREN ou qualquer outra coisa, processar como expressão
+                this.pos = savedPos;
+                this.currentToken = savedToken;
+                const expr = this.expression();
+                return { type: 'ExpressionStatement', expression: expr };
+            }
+
+            // Senão, é uma chamada de função ou expressão standalone
+            this.pos = savedPos;
+            this.currentToken = savedToken;
+            const expr = this.expression();
+            return { type: 'ExpressionStatement', expression: expr };
+            
+        default:
+            throw new Error(
+                `❌ Erro na linha ${this.currentToken.line}: ` +
+                `Statement inválido: ${this.currentToken.type}`
+            );
     }
-    
-    // Se o próximo token é DOT, pode ser atribuição de propriedade
-    if (this.currentToken && this.currentToken.type === 'DOT') {
-        this.pos = savedPos;
-        this.currentToken = savedToken;
-        return this.assignmentStatement();
-    }
-    
-    // Senão, é uma chamada de função ou expressão standalone
-    this.pos = savedPos;
-    this.currentToken = savedToken;
-    const expr = this.expression();
-    return { type: 'ExpressionStatement', expression: expr };
-            default:
-                throw new Error(
-                    `❌ Erro na linha ${this.currentToken.line}: ` +
-                    `Statement inválido: ${this.currentToken.type}`
-                );
-        }
-    }
+}
 
     printStatement() {
         this.advance();
@@ -215,11 +238,41 @@ class Parser {
         return { type: 'Return', value };
     }
 
+    forStatement() {
+        this.advance(); // pular 'para'
+        const varName = this.expect('IDENTIFIER').value;
+        this.expect('DE');
+        const start = this.expression();
+        this.expect('ATE');
+        const end = this.expression();
+        this.expect('COLON');
+
+        const body = [];
+        while (
+            this.currentToken &&
+            this.currentToken.type !== 'END' &&
+            this.currentToken.type !== 'EOF'
+        ) {
+            body.push(this.statement());
+        }
+
+        this.expect('END');
+
+        return { type: 'For', varName, start, end, body };
+    }
+
+    importStatement() {
+        this.advance(); // pular 'importar'
+        const name = this.expect('IDENTIFIER').value;
+        this.expect('DE');
+        const source = this.expect('STRING').value;
+        return { type: 'Import', name, source };
+    }
+
     assignmentStatement() {
         const name = this.expect('IDENTIFIER').value;
         let target = { type: 'Identifier', name };
-        
-        // Suporta atribuição em propriedades: dados.nome = "João"
+
         while (this.currentToken && this.currentToken.type === 'DOT') {
             this.advance();
             const property = this.expect('IDENTIFIER').value;
@@ -229,13 +282,35 @@ class Parser {
                 property
             };
         }
-        
+
         this.expect('ASSIGN');
         const value = this.expression();
         return { type: 'Assignment', name: target, value };
     }
 
     comparison() {
+        let left = this.comparisonUnit();
+
+        while (
+            this.currentToken &&
+            ['AND', 'OR'].includes(this.currentToken.type)
+        ) {
+            const operator = this.currentToken.type;
+            this.advance();
+            const right = this.comparisonUnit();
+            left = { type: 'LogicalOp', operator, left, right };
+        }
+
+        return left;
+    }
+
+    comparisonUnit() {
+        if (this.currentToken && this.currentToken.type === 'NOT') {
+            this.advance();
+            const operand = this.comparisonUnit();
+            return { type: 'UnaryOp', operator: 'NOT', operand };
+        }
+
         let left = this.expression();
 
         if (
@@ -256,9 +331,10 @@ class Parser {
 
         while (
             this.currentToken &&
-            ['PLUS', 'MINUS'].includes(this.currentToken.type)
+            ['PLUS', 'MINUS', 'KW_PLUS', 'KW_MINUS'].includes(this.currentToken.type)
         ) {
-            const operator = this.currentToken.type;
+            const op = this.currentToken.type;
+            const operator = op === 'KW_PLUS' ? 'PLUS' : op === 'KW_MINUS' ? 'MINUS' : op;
             this.advance();
             const right = this.term();
             result = { type: 'BinaryOp', operator, left: result, right };
@@ -300,9 +376,29 @@ class Parser {
             return { type: 'String', value: token.value };
         }
 
+        if (token.type === 'TRUE') {
+            this.advance();
+            return { type: 'Boolean', value: true };
+        }
+
+        if (token.type === 'FALSE') {
+            this.advance();
+            return { type: 'Boolean', value: false };
+        }
+
+        if (token.type === 'NULL') {
+            this.advance();
+            return { type: 'Null' };
+        }
+
         // ARRAY LITERAL
         if (token.type === 'LBRACKET') {
             return this.arrayLiteral();
+        }
+
+        // ✅ OBJECT LITERAL - NOVO!
+        if (token.type === 'LBRACE') {
+            return this.objectLiteral();
         }
 
         if (token.type === 'IDENTIFIER') {
@@ -337,8 +433,7 @@ class Parser {
             while (this.currentToken && this.currentToken.type === 'DOT') {
                 this.advance();
                 const propertyOrMethod = this.expect('IDENTIFIER').value;
-                
-                // Se tem parênteses, é um método
+
                 if (this.currentToken && this.currentToken.type === 'LPAREN') {
                     this.advance();
                     const args = [];
@@ -357,9 +452,7 @@ class Parser {
                         method: propertyOrMethod,
                         args
                     };
-                } 
-                // Se não tem parênteses, é uma propriedade
-                else {
+                } else {
                     result = {
                         type: 'PropertyAccess',
                         object: result,
@@ -384,7 +477,7 @@ class Parser {
         );
     }
 
-    // NOVO: Parse array literal [1, 2, 3]
+    // Parse array literal [1, 2, 3]
     arrayLiteral() {
         this.expect('LBRACKET');
         const elements = [];
@@ -400,7 +493,48 @@ class Parser {
 
         return { type: 'ArrayLiteral', elements };
     }
+
+    // ✅ NOVO: Parse object literal {chave: valor, ...}
+    objectLiteral() {
+        this.expect('LBRACE');  // {
+        const properties = {};
+
+        while (this.currentToken && this.currentToken.type !== 'RBRACE') {
+            // Nome da propriedade (pode ser IDENTIFIER ou STRING)
+            let key;
+            
+            if (this.currentToken.type === 'IDENTIFIER') {
+                key = this.currentToken.value;
+                this.advance();
+            } else if (this.currentToken.type === 'STRING') {
+                key = this.currentToken.value;
+                this.advance();
+            } else {
+                throw new Error(
+                    `❌ Erro na linha ${this.currentToken.line}: ` +
+                    `Esperava nome de propriedade (identificador ou string), ` +
+                    `mas encontrou ${this.currentToken.type}`
+                );
+            }
+
+            // Dois pontos
+            this.expect('COLON');
+
+            // Valor da propriedade
+            const value = this.expression();
+
+            properties[key] = value;
+
+            // Vírgula opcional entre propriedades
+            if (this.currentToken && this.currentToken.type === 'COMMA') {
+                this.advance();
+            }
+        }
+
+        this.expect('RBRACE');  // }
+
+        return { type: 'ObjectLiteral', properties };
+    }
 }
 
 module.exports = Parser;
-
