@@ -11,3 +11,4 @@ escreva total
 
 se pontos maior 0:
     escreva "Classificados para os oitavos!"
+fim

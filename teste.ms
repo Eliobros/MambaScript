@@ -1,5 +1,6 @@
 variavel idade = 18
 se idade >= 18:
-escreva "maior de idade"
-senao
-escreva "menor de idade"
+  escreva "maior de idade"
+senao:
+  escreva "menor de idade"
+fim

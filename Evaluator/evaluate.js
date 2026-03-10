@@ -198,8 +198,8 @@ class Evaluator {
                     if (typeof left === 'number' && typeof right === 'number') {
                         return left + right;
                     }
-                    if (typeof left === 'string' && typeof right === 'string') {
-                        return left + right;
+                    if (typeof left === 'string' || typeof right === 'string') {
+                        return String(left) + String(right);
                     }
                     throw new Error(`Erro de Tipo: Não é possível somar ${typeof left} com ${typeof right}. Use .paraTexto() ou .paraNumero().`);
                 }

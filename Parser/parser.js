@@ -315,9 +315,11 @@ class Parser {
 
         if (
             this.currentToken &&
-            ['GT', 'LT', 'EQ', 'GTE', 'LTE'].includes(this.currentToken.type)
+            ['GT', 'LT', 'EQ', 'GTE', 'LTE', 'KW_GT', 'KW_LT', 'KW_EQ', 'KW_GTE', 'KW_LTE'].includes(this.currentToken.type)
         ) {
-            const operator = this.currentToken.type;
+            let operator = this.currentToken.type;
+            const kwMap = { 'KW_GT': 'GT', 'KW_LT': 'LT', 'KW_EQ': 'EQ', 'KW_GTE': 'GTE', 'KW_LTE': 'LTE' };
+            if (kwMap[operator]) operator = kwMap[operator];
             this.advance();
             const right = this.expression();
             return { type: 'Comparison', operator, left, right };
@@ -348,9 +350,10 @@ class Parser {
 
         while (
             this.currentToken &&
-            ['MULT', 'DIV'].includes(this.currentToken.type)
+            ['MULT', 'DIV', 'KW_MULT', 'KW_DIV'].includes(this.currentToken.type)
         ) {
-            const operator = this.currentToken.type;
+            const op = this.currentToken.type;
+            const operator = op === 'KW_MULT' ? 'MULT' : op === 'KW_DIV' ? 'DIV' : op;
             this.advance();
             const right = this.factor();
             result = { type: 'BinaryOp', operator, left: result, right };
