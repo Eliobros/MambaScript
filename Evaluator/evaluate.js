@@ -118,6 +118,21 @@ class Evaluator {
             case 'ExpressionStatement':
                 this.evaluate(node.expression);
                 break;
+                
+                case 'TryCatch':
+    try {
+        for (const stmt of node.body) {
+            this.executeStatement(stmt);
+            if (this.returnValue !== null) return;
+        }
+    } catch (e) {
+        this.variables[node.errorVar] = e.message;
+        for (const stmt of node.catchBody) {
+            this.executeStatement(stmt);
+            if (this.returnValue !== null) return;
+        }
+    }
+    break;
 
             default:
                 throw new Error(`Statement desconhecido: ${node.type}`);
@@ -265,9 +280,15 @@ class Evaluator {
                     if (this.returnValue !== null) break;
                 }
                 const result = this.returnValue;
-                this.returnValue = oldReturnValue;
-                this.variables = oldVars;
-                return result !== null ? result : undefined;
+    this.returnValue = oldReturnValue;
+
+    // Preserva mudanças feitas em variáveis globais
+    for (const key of Object.keys(oldVars)) {
+        oldVars[key] = this.variables[key];
+    }
+    this.variables = oldVars;
+
+    return result !== null ? result : undefined;
 
             case 'LogicalOp':
                 if (node.operator === 'AND') {
@@ -374,25 +395,69 @@ class Evaluator {
         return method(...evaluatedArgs);
     }
 
-    createDateObject(timezone) {
+        createDateObject(timezone) {
         const now = new Date();
-        const options = timezone ? { timeZone: timezone } : {};
-        const getDateInTimezone = () => {
-            if (timezone) {
-                const isoString = now.toLocaleString('en-US', { timeZone: timezone });
-                return new Date(isoString);
-            }
-            return now;
+
+        const getLocalDate = () => {
+            if (!timezone) return now;
+
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: timezone,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hour12: false
+            }).formatToParts(now);
+
+            const get = (type) => parseInt(parts.find(p => p.type === type).value);
+
+            return new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
         };
-        const localDate = getDateInTimezone();
+
+        const localDate = getLocalDate();
+
+        const nomesMeses = [
+            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
+        ];
+
+        const nomesSemana = [
+            "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira",
+            "Quinta-feira", "Sexta-feira", "Sábado"
+        ];
 
         return {
             _type: 'DateObject',
-            mostrarHora: () => now.toLocaleTimeString('pt-BR', options),
-            mostrarData: () => now.toLocaleDateString('pt-BR', options),
-            ano: () => localDate.getFullYear()
+
+            // ── Exibição ──────────────────────────────
+            mostrarHora: () => localDate.toLocaleTimeString('pt-BR'),
+            mostrarData: () => localDate.toLocaleDateString('pt-BR'),
+
+            // ── Simples ───────────────────────────────
+            ano: () => localDate.getFullYear(),
+            dia: () => localDate.getDate(),
+            horas: () => localDate.getHours(),
+            minutos: () => localDate.getMinutes(),
+            segundos: () => localDate.getSeconds(),
+
+            // ── Mês (número ou nome) ──────────────────
+            mes: () => ({
+                numero: localDate.getMonth() + 1,
+                nome: nomesMeses[localDate.getMonth()]
+            }),
+
+            // ── Semana (número ou nome) ───────────────
+            semana: () => ({
+                numero: localDate.getDay(),
+                nome: nomesSemana[localDate.getDay()]
+            }),
+
+            // ── Extras ────────────────────────────────
+            timestamp: () => now.getTime(),
+            formatado: () => `${String(localDate.getDate()).padStart(2, '0')}/${String(localDate.getMonth() + 1).padStart(2, '0')}/${localDate.getFullYear()}`,
+            horaFormatada: () => `${String(localDate.getHours()).padStart(2, '0')}:${String(localDate.getMinutes()).padStart(2, '0')}:${String(localDate.getSeconds()).padStart(2, '0')}`
         };
     }
+
 
     lerInput() {
         const prompt = require('prompt-sync')({ sigint: true });

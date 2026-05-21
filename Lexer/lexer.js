@@ -127,7 +127,9 @@ class Lexer {
             'mais': 'KW_PLUS',
             'menos': 'KW_MINUS',
             'vezes': 'KW_MULT',
-            'dividido': 'KW_DIV'
+            'dividido': 'KW_DIV',
+            'tente': 'TENTE', 
+            'capturar': 'CAPTURAR' 
         };
 
         const type = keywords[id] || 'IDENTIFIER';

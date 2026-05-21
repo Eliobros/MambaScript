@@ -86,6 +86,8 @@ class Parser {
             return this.returnStatement();
         case 'IMPORT':
             return this.importStatement();
+        case 'TENTE':
+            return this.tryCatchStatement();
         case 'IDENTIFIER':
             // ✅ ATUALIZADO - Detecta assignment vs method call
             const savedPos = this.pos;
@@ -479,6 +481,39 @@ class Parser {
             `Token inesperado: ${token.type}`
         );
     }
+    
+    tryCatchStatement() {
+    this.advance(); // pular 'tente'
+    this.expect('COLON');
+
+    const body = [];
+    while (
+        this.currentToken &&
+        this.currentToken.type !== 'CAPTURAR' &&
+        this.currentToken.type !== 'EOF'
+    ) {
+        body.push(this.statement());
+    }
+
+    this.expect('CAPTURAR');
+    this.expect('LPAREN');
+    const errorVar = this.expect('IDENTIFIER').value;
+    this.expect('RPAREN');
+    this.expect('COLON');
+
+    const catchBody = [];
+    while (
+        this.currentToken &&
+        this.currentToken.type !== 'END' &&
+        this.currentToken.type !== 'EOF'
+    ) {
+        catchBody.push(this.statement());
+    }
+
+    this.expect('END');
+
+    return { type: 'TryCatch', body, errorVar, catchBody };
+}
 
     // Parse array literal [1, 2, 3]
     arrayLiteral() {
