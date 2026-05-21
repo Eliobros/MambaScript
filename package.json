@@ -4,7 +4,7 @@
   "description": "🐍 Linguagem de programação moçambicana - Rápida, poderosa e em português!",
   "main": "index.js",
   "bin": {
-    "mambas": "./mambas"
+    "mambas": "mambas"
   },
   "scripts": {
     "test": "node mambas exemplos/ola.ms"
@@ -25,7 +25,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Eliobros/MambaScript.git"
+    "url": "git+https://github.com/Eliobros/MambaScript.git"
   },
   "bugs": {
     "url": "https://github.com/Eliobros/MambaScript/issues"
