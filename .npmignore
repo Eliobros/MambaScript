@@ -10,5 +10,22 @@ index.js
 .git
 .gitignore
 
-# Exemplos (opcional - se quiser incluir, remove esta linha)
- exemplos/
+# Ignorar testes
+test*.ms
+teste*.ms
+testando.ms
+
+# Ignorar exemplos (se não quiser publicar no pacote)
+examples/
+exemplos/
+
+# Ignorar binários e pasta dist
+mambas-win.exe
+mambas-linux
+mambas-macos
+dist/
+
+# Ignorar arquivos que não são necessários no npm
+CHANGELOG.md
+README.md
+LICENSE

@@ -502,8 +502,8 @@ class Evaluator {
 
         const fs = require('fs');
         const path = require('path');
-        const Lexer = require(path.join(__dirname, '..', 'Lexer', 'lexer'));
-        const Parser = require(path.join(__dirname, '..', 'Parser', 'parser'));
+        const Lexer = require('../Lexer/lexer');
+        const Parser = require('../Parser/parser');
 
         const baseDir = typeof this.filePath === 'string' && fs.existsSync(this.filePath) && fs.statSync(this.filePath).isFile()
             ? path.dirname(this.filePath)

@@ -36,5 +36,20 @@
   },
   "dependencies": {
     "prompt-sync": "^4.2.0"
+  },
+   "pkg": {
+    "scripts": [
+  "Lexer/lexer.js",
+  "Parser/parser.js",
+  "Evaluator/evaluate.js"
+],
+    "assets": [
+      "node_modules/prompt-sync/**/*"
+    ],
+    "targets": [
+      "node18-win-x64",
+      "node18-linux-x64",
+      "node18-macos-x64"
+    ]
   }
 }

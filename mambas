@@ -3,11 +3,10 @@
 const fs = require('fs');
 const path = require('path');
 
-// Resolve o caminho dos módulos relativos ao diretório do script
-const scriptDir = __dirname;
-const Lexer = require(path.join(scriptDir, 'Lexer', 'lexer'));
-const Parser = require(path.join(scriptDir, 'Parser', 'parser'));
-const Evaluator = require(path.join(scriptDir, 'Evaluator', 'evaluate'));
+// ✅ Substituído path.join dinâmico por caminhos estáticos literais (O pkg agora vai entender perfeitamente)
+const Lexer = require('./Lexer/lexer.js');
+const Parser = require('./Parser/parser.js');
+const Evaluator = require('./Evaluator/evaluate.js');
 
 // Verifica se foi passado um arquivo
 if (process.argv.length < 3) {
@@ -23,8 +22,8 @@ if (process.argv.length < 3) {
 const filename = process.argv[2];
 
 // Resolve o caminho completo do arquivo
-const fullPath = path.isAbsolute(filename) 
-    ? filename 
+const fullPath = path.isAbsolute(filename)
+    ? filename
     : path.join(process.cwd(), filename);
 
 if (!fs.existsSync(fullPath)) {
@@ -38,15 +37,15 @@ try {
     // Lexer
     const lexer = new Lexer(code);
     const tokens = lexer.tokenize();
-    
+
     // Parser
     const parser = new Parser(tokens);
     const ast = parser.parse();
-    
+
     // Evaluator
     const evaluator = new Evaluator(fullPath);
     evaluator.execute(ast);
-    
+
 } catch (error) {
     console.error('❌ Erro MambaScript:', error.message);
     process.exit(1);

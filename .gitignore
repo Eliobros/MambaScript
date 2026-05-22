@@ -1,1 +1,20 @@
+# Ignorar dependências
 node_modules/
+
+# Ignorar arquivos de teste
+test*.ms
+teste*.ms
+testando.ms
+
+# Ignorar binários gerados pelo pkg
+mambas-win.exe
+mambas-linux
+mambas-macos
+
+# Ignorar pasta dist (se não quiser versionar os executáveis)
+#dist/
+
+# Ignorar arquivos temporários e logs
+*.log
+*.tmp
+*.bak
