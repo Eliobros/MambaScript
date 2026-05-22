@@ -69,12 +69,12 @@ class Evaluator {
                 if (this.evaluate(node.condition)) {
                     for (const stmt of node.body) {
                         this.executeStatement(stmt);
-                        if (this.returnValue !== null) return;
+                        if (this.hasReturned) return;
                     }
                 } else if (node.elseBody) {
                     for (const stmt of node.elseBody) {
                         this.executeStatement(stmt);
-                        if (this.returnValue !== null) return;
+                        if (this.hasReturned) return;
                     }
                 }
                 break;
@@ -83,7 +83,7 @@ class Evaluator {
                 while (this.evaluate(node.condition)) {
                     for (const stmt of node.body) {
                         this.executeStatement(stmt);
-                        if (this.returnValue !== null) return;
+                        if (this.hasReturned) return;
                     }
                 }
                 break;
@@ -97,7 +97,8 @@ class Evaluator {
 
             case 'Return':
                 this.returnValue = this.evaluate(node.value);
-                break;
+                this.hasReturned = true;
+                  break;
 
             case 'For':
                 const startVal = this.evaluate(node.start);
@@ -106,7 +107,7 @@ class Evaluator {
                     this.variables[node.varName] = i;
                     for (const stmt of node.body) {
                         this.executeStatement(stmt);
-                        if (this.returnValue !== null) return;
+                        if (this.hasReturned) return;
                     }
                 }
                 break;
@@ -123,13 +124,13 @@ class Evaluator {
     try {
         for (const stmt of node.body) {
             this.executeStatement(stmt);
-            if (this.returnValue !== null) return;
+            if (this.hasReturned) return;
         }
     } catch (e) {
         this.variables[node.errorVar] = e.message;
         for (const stmt of node.catchBody) {
             this.executeStatement(stmt);
-            if (this.returnValue !== null) return;
+            if (this.hasReturned) return;
         }
     }
     break;
@@ -268,27 +269,25 @@ class Evaluator {
                     throw new Error(`Função não definida: ${node.name}`);
                 }
                 const func = this.functions[node.name];
-                const oldVars = {...this.variables};
-                const oldReturnValue = this.returnValue;
-                this.returnValue = null;
+const oldVars = { ...this.variables };
+const oldReturnValue = this.returnValue;
+this.returnValue = null;
+this.hasReturned = false;
 
-                for (let i = 0; i < func.params.length; i++) {
-                    this.variables[func.params[i]] = this.evaluate(node.args[i]);
-                }
-                for (const stmt of func.body) {
-                    this.executeStatement(stmt);
-                    if (this.returnValue !== null) break;
-                }
-                const result = this.returnValue;
-    this.returnValue = oldReturnValue;
+this.variables = { ...this.variables };
+for (let i = 0; i < func.params.length; i++) {
+    this.variables[func.params[i]] = this.evaluate(node.args[i]);
+}
+for (const stmt of func.body) {
+    this.executeStatement(stmt);
+    if (this.hasReturned) break;
+}
+const result = this.returnValue;
+this.variables = oldVars;
+this.returnValue = oldReturnValue;
+this.hasReturned = false;
 
-    // Preserva mudanças feitas em variáveis globais
-    for (const key of Object.keys(oldVars)) {
-        oldVars[key] = this.variables[key];
-    }
-    this.variables = oldVars;
-
-    return result !== null ? result : undefined;
+return result !== undefined ? result : undefined;
 
             case 'LogicalOp':
                 if (node.operator === 'AND') {
@@ -552,7 +551,7 @@ const candidates = [
                 }
                 for (const stmt of func.body) {
                     evalCopy.executeStatement(stmt);
-                    if (evalCopy.returnValue !== null) break;
+                    if (evalCopy.hasReturned) break;
                 }
                 return evalCopy.returnValue;
             };
