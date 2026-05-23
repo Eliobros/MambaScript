@@ -21,16 +21,20 @@ MambaScript é uma linguagem de programação criada em Moçambique, com sintaxe
 6. [Entrada e Saída](#-entrada-e-saída)
 7. [Estruturas de Controle](#-estruturas-de-controle)
 8. [Funções](#-funções)
-9. [Strings](#-strings)
-10. [Números](#-números)
-11. [Arrays](#-arrays)
-12. [Objectos](#-objectos)
-13. [Sistema de Importação](#-sistema-de-importação)
-14. [Módulos Built-in](#-módulos-built-in)
-15. [Funções Built-in](#-funções-built-in)
-16. [Exemplos Completos](#-exemplos-completos)
-17. [Contribuição](#-contribuição)
-18. [Licença](#-licença)
+9. [Tratamento de Erros](#-tratamento-de-erros)
+10. [Strings](#-strings)
+11. [Números](#-números)
+12. [Arrays](#-arrays)
+13. [Objectos](#-objectos)
+14. [Sistema de Importação](#-sistema-de-importação)
+15. [Módulos Built-in](#-módulos-built-in)
+16. [Funções Built-in](#-funções-built-in)
+17. [Servidor HTTP](#-servidor-http)
+18. [Base de Dados MySQL](#-base-de-dados-mysql)
+19. [Sistema de Pacotes](#-sistema-de-pacotes)
+20. [Exemplos Completos](#-exemplos-completos)
+21. [Contribuição](#-contribuição)
+22. [Licença](#-licença)
 
 ---
 
@@ -66,7 +70,7 @@ mambas meu_programa.ms
 
 Crie um arquivo chamado `ola.ms`:
 
-```mambascript
+```ms
 # O meu primeiro programa em MambaScript!
 escreva "Olá, Mundo! 🐍"
 
@@ -102,28 +106,13 @@ MambaScript suporta os seguintes tipos de dados:
 | Array | `[1, 2, 3]` | Lista ordenada de valores |
 | Objecto | `{nome: "Ana"}` | Coleção de pares chave-valor |
 
-### Exemplos
-
-```mambascript
-# Números
+```ms
 variavel inteiro = 42
 variavel decimal = 3.14
-
-# Strings
 variavel saudacao = "Olá!"
-variavel cidade = 'Maputo'
-
-# Booleanos
 variavel ativo = verdadeiro
-variavel desligado = falso
-
-# Nulo
 variavel vazio = nulo
-
-# Array
 variavel frutas = ["manga", "papaia", "coco"]
-
-# Objecto
 variavel pessoa = {nome: "Habibo", idade: 25}
 ```
 
@@ -133,7 +122,7 @@ variavel pessoa = {nome: "Habibo", idade: 25}
 
 As variáveis são declaradas com a palavra-chave `variavel`:
 
-```mambascript
+```ms
 variavel nome = "MambaScript"
 variavel versao = 2
 variavel ativo = verdadeiro
@@ -145,7 +134,7 @@ escreva ativo
 
 As variáveis podem ser reatribuídas:
 
-```mambascript
+```ms
 variavel contador = 0
 contador = contador + 1
 escreva contador
@@ -157,7 +146,7 @@ escreva contador
 
 ### Operadores Aritméticos
 
-MambaScript permite usar **símbolos** ou **palavras-chave** em português para operações aritméticas:
+MambaScript permite usar **símbolos** ou **palavras-chave** em português:
 
 | Operação | Símbolo | Palavra-chave | Exemplo |
 |----------|---------|---------------|---------|
@@ -166,38 +155,22 @@ MambaScript permite usar **símbolos** ou **palavras-chave** em português para 
 | Multiplicação | `*` | `vezes` | `6 * 7` ou `6 vezes 7` |
 | Divisão | `/` | `dividido` | `20 / 5` ou `20 dividido 5` |
 
-```mambascript
-# Usando símbolos
+```ms
 escreva 10 + 5
-escreva 20 - 8
-escreva 4 * 3
-escreva 15 / 3
-
-# Usando palavras-chave em português
 escreva 10 mais 5
-escreva 20 menos 8
 escreva 4 vezes 3
 escreva 15 dividido 3
 ```
 
 ### Operadores de Comparação
 
-| Operação | Símbolo | Palavra-chave | Exemplo |
-|----------|---------|---------------|---------|
-| Igual | `==` | `igual` | `a == b` ou `a igual b` |
-| Maior que | `>` | `maior` | `a > b` ou `a maior b` |
-| Menor que | `<` | `menor` | `a < b` ou `a menor b` |
-| Maior ou igual | `>=` | `maiorIgual` | `a >= b` ou `a maiorIgual b` |
-| Menor ou igual | `<=` | `menorIgual` | `a <= b` ou `a menorIgual b` |
-
-```mambascript
-variavel a = 10
-variavel b = 5
-
-escreva a maior b
-escreva a igual b
-escreva a menorIgual 10
-```
+| Operação | Símbolo | Palavra-chave |
+|----------|---------|---------------|
+| Igual | `==` | `igual` |
+| Maior que | `>` | `maior` |
+| Menor que | `<` | `menor` |
+| Maior ou igual | `>=` | `maiorIgual` |
+| Menor ou igual | `<=` | `menorIgual` |
 
 ### Operadores Lógicos
 
@@ -207,17 +180,12 @@ escreva a menorIgual 10
 | `ou` | OU lógico (OR) | `verdadeiro ou falso` |
 | `nao` | Negação (NOT) | `nao verdadeiro` |
 
-```mambascript
+```ms
 variavel temIdade = verdadeiro
 variavel temDocumento = verdadeiro
 
 se temIdade e temDocumento:
     escreva "Aprovado!"
-fim
-
-variavel chovendo = falso
-se nao chovendo:
-    escreva "Pode sair!"
 fim
 ```
 
@@ -227,30 +195,18 @@ fim
 
 ### Saída (escreva)
 
-Use `escreva` para imprimir valores na tela:
-
-```mambascript
+```ms
 escreva "Olá, Mundo!"
 escreva 42
 escreva verdadeiro
-
-variavel nome = "MambaScript"
-escreva nome
-escreva "A linguagem é: " + nome
 ```
 
 ### Entrada (ler)
 
-Use `ler()` para ler dados do utilizador:
-
-```mambascript
+```ms
 escreva "Qual é o teu nome?"
 variavel nome = ler()
 escreva "Olá, " + nome + "!"
-
-escreva "Qual é a tua idade?"
-variavel idade = ler()
-escreva "Tens " + idade + " anos."
 ```
 
 ---
@@ -259,7 +215,7 @@ escreva "Tens " + idade + " anos."
 
 ### Condicional (se / senao)
 
-```mambascript
+```ms
 variavel idade = 18
 
 se idade >= 18:
@@ -269,9 +225,9 @@ senao:
 fim
 ```
 
-Condicionais encadeadas:
+Condicionais aninhadas:
 
-```mambascript
+```ms
 variavel nota = 85
 
 se nota >= 90:
@@ -285,9 +241,9 @@ senao:
 fim
 ```
 
-### Ciclo Enquanto (while)
+### Ciclo Enquanto
 
-```mambascript
+```ms
 variavel contador = 1
 
 enquanto contador <= 5:
@@ -296,9 +252,9 @@ enquanto contador <= 5:
 fim
 ```
 
-### Ciclo Para (for)
+### Ciclo Para
 
-```mambascript
+```ms
 para i de 1 ate 10:
     escreva i
 fim
@@ -306,7 +262,7 @@ fim
 
 Exemplo com cálculo:
 
-```mambascript
+```ms
 # Tabuada do 7
 para i de 1 ate 10:
     escreva "7 x " + i + " = " + (7 * i)
@@ -317,20 +273,19 @@ fim
 
 ## 🔧 Funções
 
-Funções são declaradas com a palavra-chave `funcao` e encerradas com `fim`:
+Funções são declaradas com `funcao` e encerradas com `fim`:
 
-```mambascript
+```ms
 funcao saudacao(nome):
     escreva "Olá, " + nome + "!"
 fim
 
 saudacao("Habibo")
-saudacao("Maria")
 ```
 
 ### Funções com retorno
 
-```mambascript
+```ms
 funcao soma(a, b):
     retorna a + b
 fim
@@ -339,21 +294,21 @@ variavel resultado = soma(10, 20)
 escreva resultado
 ```
 
-### Funções com múltiplos parâmetros
+### Funções como variáveis
 
-```mambascript
-funcao calcularMedia(nota1, nota2, nota3):
-    variavel total = nota1 + nota2 + nota3
-    retorna total / 3
+As funções podem ser atribuídas a variáveis e passadas como argumentos:
+
+```ms
+variavel dobrar = funcao(x):
+    retorna x * 2
 fim
 
-variavel media = calcularMedia(15, 18, 12)
-escreva "Média: " + media
+escreva dobrar(5)
 ```
 
 ### Funções recursivas
 
-```mambascript
+```ms
 funcao fatorial(n):
     se n <= 1:
         retorna 1
@@ -366,41 +321,40 @@ escreva fatorial(5)
 
 ---
 
+## 🛡️ Tratamento de Erros
+
+Use `tentar` e `pegar` para lidar com erros em tempo de execução:
+
+```ms
+tentar:
+    variavel dados = json_ler("ficheiro.json")
+    escreva dados.nome
+pegar erro:
+    escreva "Ocorreu um erro: " + erro
+fim
+```
+
+---
+
 ## 🔤 Strings
-
-### Criação de Strings
-
-```mambascript
-variavel texto1 = "Olá, Mundo!"
-variavel texto2 = 'MambaScript'
-```
-
-### Concatenação
-
-```mambascript
-variavel nome = "Habibo"
-variavel saudacao = "Olá, " + nome + "!"
-escreva saudacao
-```
 
 ### Métodos de String
 
 | Método | Descrição | Exemplo |
 |--------|-----------|---------|
-| `.tamanho()` | Retorna o comprimento da string | `"olá".tamanho()` → `3` |
+| `.tamanho()` | Comprimento da string | `"olá".tamanho()` → `3` |
 | `.maiuscula()` | Converte para maiúsculas | `"olá".maiuscula()` → `"OLÁ"` |
 | `.minuscula()` | Converte para minúsculas | `"OLÁ".minuscula()` → `"olá"` |
 | `.paraNumero()` | Converte string para número | `"42".paraNumero()` → `42` |
 
-```mambascript
+```ms
 variavel texto = "mambascript"
 
 escreva texto.tamanho()
 escreva texto.maiuscula()
 escreva texto.minuscula()
 
-variavel numeroTexto = "123"
-variavel numero = numeroTexto.paraNumero()
+variavel numero = "123".paraNumero()
 escreva numero + 7
 ```
 
@@ -414,10 +368,9 @@ escreva numero + 7
 |--------|-----------|---------|
 | `.paraTexto()` | Converte número para string | `42.paraTexto()` → `"42"` |
 
-```mambascript
+```ms
 variavel idade = 25
-variavel idadeTexto = idade.paraTexto()
-escreva "Idade: " + idadeTexto
+escreva "Idade: " + idade.paraTexto()
 ```
 
 ---
@@ -426,52 +379,38 @@ escreva "Idade: " + idadeTexto
 
 ### Criação e Acesso
 
-```mambascript
+```ms
 variavel frutas = ["manga", "papaia", "banana", "coco"]
 
-# Acesso por índice (começa em 0)
 escreva frutas[0]
 escreva frutas[2]
 ```
 
 ### Métodos de Array
 
-| Método | Descrição | Exemplo |
-|--------|-----------|---------|
-| `.tamanho()` | Retorna o número de elementos | `frutas.tamanho()` |
-| `.adicionar(item)` | Adiciona um item ao final | `frutas.adicionar("limão")` |
-| `.remover(indice)` | Remove o item no índice | `frutas.remover(0)` |
-| `.pegar(indice)` | Obtém o item no índice | `frutas.pegar(1)` |
-| `.contem(item)` | Verifica se contém o item | `frutas.contem("manga")` |
-| `.juntar(separador)` | Junta elementos numa string | `frutas.juntar(", ")` |
+| Método | Descrição |
+|--------|-----------|
+| `.tamanho()` | Número de elementos |
+| `.adicionar(item)` | Adiciona ao final |
+| `.remover(indice)` | Remove pelo índice |
+| `.pegar(indice)` | Obtém pelo índice |
+| `.contem(item)` | Verifica se contém |
+| `.juntar(separador)` | Junta em string |
 
-```mambascript
+```ms
 variavel numeros = [10, 20, 30]
 
-# Tamanho
-escreva numeros.tamanho()
-
-# Adicionar
 numeros.adicionar(40)
-escreva numeros
-
-# Verificar
+escreva numeros.tamanho()
 escreva numeros.contem(20)
-
-# Pegar
-escreva numeros.pegar(2)
-
-# Juntar
 escreva numeros.juntar(" - ")
-
-# Remover
 numeros.remover(0)
-escreva numeros
+escreva numeros.pegar(0)
 ```
 
 ### Iterar sobre um Array
 
-```mambascript
+```ms
 variavel cidades = ["Maputo", "Beira", "Nampula", "Quelimane"]
 
 para i de 0 ate cidades.tamanho() - 1:
@@ -483,36 +422,30 @@ fim
 
 ## 🏗️ Objectos
 
-### Criação de Objectos
+### Criação e Acesso
 
-```mambascript
+```ms
 variavel pessoa = {
     nome: "Habibo",
     idade: 25,
     cidade: "Maputo"
 }
-```
 
-### Acesso a Propriedades
-
-```mambascript
 escreva pessoa.nome
 escreva pessoa.idade
-escreva pessoa.cidade
 ```
 
 ### Modificação de Propriedades
 
-```mambascript
+```ms
 pessoa.nome = "João"
 pessoa.idade = 30
 escreva pessoa.nome
-escreva pessoa.idade
 ```
 
 ### Objectos com Arrays
 
-```mambascript
+```ms
 variavel turma = {
     nome: "Turma A",
     alunos: ["Ana", "Carlos", "Maria"],
@@ -529,46 +462,41 @@ escreva turma.alunos[0]
 
 ### Importar Módulos Locais
 
-Crie um arquivo `utils.ms` na pasta `modulos_mambas/`:
+Crie um arquivo em `modulos_mambas/`:
 
-```mambascript
+```ms
 # modulos_mambas/utils.ms
 funcao dobro(n):
     retorna n * 2
 fim
 ```
 
-Importe no seu programa principal:
+Importe no programa principal:
 
-```mambascript
+```ms
 importar utils de "utils"
-```
-
-### Importar Módulos de Arquivo
-
-```mambascript
-importar modulo de "arquivo"
+escreva utils.dobro(10)
 ```
 
 ### Importar Módulos Built-in
 
-```mambascript
+```ms
 importar matematica de "matematica"
 importar fs de "fs"
 importar caminho de "caminho"
+importar http de "http"
+importar bd de "mysql"
 ```
 
 ---
 
-## 🧰 Módulos Built-in
+## 🔩 Módulos Built-in
 
 ### 📐 Módulo `matematica`
 
-Funções e constantes matemáticas:
-
 | Função / Constante | Descrição |
 |---------------------|-----------|
-| `PI` | Valor de π (3.14159...) |
+| `PI` | Valor de π |
 | `raiz(n)` | Raiz quadrada |
 | `potencia(base, exp)` | Potenciação |
 | `absoluto(n)` | Valor absoluto |
@@ -579,101 +507,374 @@ Funções e constantes matemáticas:
 | `seno(n)` | Seno |
 | `cosseno(n)` | Cosseno |
 
-```mambascript
+```ms
 importar matematica de "matematica"
 
 escreva matematica.PI
 escreva matematica.raiz(144)
 escreva matematica.potencia(2, 10)
-escreva matematica.absoluto(-42)
 escreva matematica.arredondar(3.7)
-escreva matematica.teto(3.2)
-escreva matematica.chao(3.9)
 escreva matematica.aleatorio()
 ```
 
 ### 📁 Módulo `fs`
 
-Operações com o sistema de arquivos:
-
 | Função | Descrição |
 |--------|-----------|
 | `ler(arquivo)` | Lê o conteúdo de um arquivo |
-| `escrever(arquivo, conteudo)` | Escreve conteúdo num arquivo |
+| `escrever(arquivo, conteudo)` | Escreve num arquivo |
 | `existe(arquivo)` | Verifica se o arquivo existe |
 | `apagar(arquivo)` | Apaga um arquivo |
 
-```mambascript
+```ms
 importar fs de "fs"
 
-# Escrever num arquivo
 fs.escrever("dados.txt", "Olá, MambaScript!")
-
-# Verificar se existe
 escreva fs.existe("dados.txt")
-
-# Ler o conteúdo
 variavel conteudo = fs.ler("dados.txt")
 escreva conteudo
-
-# Apagar o arquivo
 fs.apagar("dados.txt")
 ```
 
 ### 📂 Módulo `caminho`
 
-Utilitários para manipulação de caminhos:
-
 | Função | Descrição |
 |--------|-----------|
-| `juntar(...partes)` | Junta partes do caminho |
+| `juntar(...partes)` | Junta partes de um caminho |
 | `diretorio(caminho)` | Retorna o diretório |
 | `arquivo(caminho)` | Retorna o nome do arquivo |
 | `extensao(caminho)` | Retorna a extensão |
 | `absoluto(caminho)` | Retorna o caminho absoluto |
 
-```mambascript
+```ms
 importar caminho de "caminho"
 
 escreva caminho.juntar("pasta", "arquivo.ms")
-escreva caminho.diretorio("/home/user/programa.ms")
-escreva caminho.arquivo("/home/user/programa.ms")
 escreva caminho.extensao("programa.ms")
 escreva caminho.absoluto("programa.ms")
 ```
+
+### 🌐 Módulo `http` — Cliente
+
+O módulo `http` permite fazer requisições HTTP a APIs externas:
+
+| Função | Descrição |
+|--------|-----------|
+| `get(url, cabecalhos?)` | Requisição GET |
+| `post(url, corpo, cabecalhos?)` | Requisição POST |
+| `put(url, corpo, cabecalhos?)` | Requisição PUT |
+| `apagar(url, cabecalhos?)` | Requisição DELETE |
+
+Cada função retorna um objecto com:
+
+| Propriedade | Descrição |
+|-------------|-----------|
+| `status` | Código HTTP da resposta |
+| `corpo` | Corpo da resposta (JSON ou texto) |
+| `texto` | Corpo como texto puro |
+| `ok` | `verdadeiro` se status entre 200 e 299 |
+
+```ms
+importar http de "http"
+
+variavel resposta = http.get("https://api.exemplo.com/dados")
+
+se resposta.ok:
+    escreva resposta.corpo
+senao:
+    escreva "Erro: " + resposta.status
+fim
+
+# POST com corpo JSON
+variavel resultado = http.post("https://api.exemplo.com/usuarios", {
+    "nome": "Habibo",
+    "email": "habibo@exemplo.com"
+})
+escreva resultado.status
+```
+
+---
+
+## 🖥️ Servidor HTTP
+
+O módulo `http` também permite criar servidores HTTP nativamente em MambaScript.
+
+### Criar um Servidor
+
+```ms
+importar http de "http"
+
+variavel minhaFuncao = funcao(requisicao, resposta):
+    se requisicao.url == "/":
+        resposta.json(200, {"mensagem": "Bem-vindo!"})
+    senao:
+        resposta.json(404, {"erro": "Rota não encontrada"})
+    fim
+fim
+
+variavel servidor = http.criarServidor()
+servidor.aoReceber(minhaFuncao)
+servidor.escutar(3000)
+escreva "Servidor rodando na porta 3000!"
+```
+
+### Objecto `requisicao`
+
+| Propriedade | Descrição |
+|-------------|-----------|
+| `url` | Caminho da rota (ex: `/api/usuarios`) |
+| `metodo` | Método HTTP (`GET`, `POST`, etc.) |
+| `corpo` | Corpo da requisição (JSON ou texto) |
+| `params` | Query parameters (`?id=1&nome=Elio`) |
+| `cabecalhos` | Headers da requisição |
+
+### Objecto `resposta`
+
+| Método | Descrição |
+|--------|-----------|
+| `enviar(status, conteudo)` | Envia texto ou JSON automaticamente |
+| `json(status, conteudo)` | Envia resposta JSON explícita |
+| `cabecalho(chave, valor)` | Define um header na resposta |
+| `redirecionar(url)` | Redireciona para outra URL |
+
+### Exemplo Completo de API
+
+```ms
+importar http de "http"
+
+variavel handler = funcao(requisicao, resposta):
+    variavel rota = requisicao.url
+
+    resposta.cabecalho("X-Powered-By", "MambaScript")
+    resposta.cabecalho("Access-Control-Allow-Origin", "*")
+
+    se rota == "/":
+        resposta.json(200, {
+            "mensagem": "API MambaScript",
+            "versao": "1.0",
+            "status": "online"
+        })
+    senao:
+        se rota == "/api/usuario":
+            variavel nome = requisicao.params.nome
+            resposta.json(200, {
+                "nome": nome,
+                "linguagem": "MambaScript"
+            })
+        senao:
+            resposta.json(404, {
+                "erro": "Rota não encontrada",
+                "rota": rota
+            })
+        fim
+    fim
+fim
+
+variavel servidor = http.criarServidor()
+servidor.aoReceber(handler)
+servidor.escutar(3000)
+escreva "API rodando na porta 3000!"
+```
+
+---
+
+## 🗄️ Base de Dados MySQL
+
+MambaScript tem suporte nativo a MySQL através do módulo `mysql`.
+
+### Pré-requisito
+
+O `mysql2` deve estar instalado no runtime do MambaScript:
+
+```bash
+npm install mysql2
+```
+
+### Funções do Módulo `mysql`
+
+| Função | Descrição |
+|--------|-----------|
+| `conectar(host, usuario, senha, base)` | Conecta ao banco de dados |
+| `consultar(sql, parametros?)` | Executa SELECT, retorna array |
+| `executar(sql, parametros?)` | Executa INSERT/UPDATE/DELETE |
+| `fechar()` | Fecha a conexão |
+
+O método `executar` retorna:
+
+| Propriedade | Descrição |
+|-------------|-----------|
+| `afetadas` | Número de linhas afetadas |
+| `inseridoId` | ID do último registo inserido |
+| `ok` | `verdadeiro` se afetou alguma linha |
+
+### Exemplo de Uso
+
+```ms
+importar bd de "mysql"
+
+bd.conectar("localhost", "root", "senha", "minha_base")
+
+# SELECT
+variavel usuarios = bd.consultar("SELECT * FROM usuarios")
+escreva usuarios
+
+# SELECT com parâmetros
+variavel user = bd.consultar("SELECT * FROM usuarios WHERE id = ?", [1])
+escreva user
+
+# INSERT
+variavel resultado = bd.executar(
+    "INSERT INTO usuarios (nome, email) VALUES (?, ?)",
+    ["Habibo", "habibo@exemplo.com"]
+)
+escreva "ID inserido: " + resultado.inseridoId
+
+# UPDATE
+bd.executar("UPDATE usuarios SET nome = ? WHERE id = ?", ["Elio", 1])
+
+# DELETE
+bd.executar("DELETE FROM usuarios WHERE id = ?", [1])
+
+bd.fechar()
+```
+
+### API com MySQL
+
+```ms
+importar http de "http"
+importar bd de "mysql"
+
+bd.conectar("localhost", "root", "senha", "app_db")
+
+variavel handler = funcao(requisicao, resposta):
+    se requisicao.url == "/api/usuarios":
+        variavel usuarios = bd.consultar("SELECT * FROM usuarios")
+        resposta.json(200, {"usuarios": usuarios})
+    senao:
+        resposta.json(404, {"erro": "Rota não encontrada"})
+    fim
+fim
+
+variavel servidor = http.criarServidor()
+servidor.aoReceber(handler)
+servidor.escutar(3000)
+escreva "API com MySQL rodando na porta 3000!"
+```
+
+---
+
+## 📦 Sistema de Pacotes
+
+### Estrutura de um Pacote
+
+```
+meu-pacote/
+├── index.ms       ← código da biblioteca
+└── pacote.json    ← metadados
+```
+
+### Ficheiro `pacote.json`
+
+```json
+{
+  "nome": "meu-pacote",
+  "versao": "1.0.0",
+  "descricao": "Descrição do que o pacote faz",
+  "autor": "teu-nome"
+}
+```
+
+### Ficheiro `index.ms`
+
+```ms
+funcao saudacao(nome):
+    retorna "Olá, " + nome + "!"
+fim
+
+funcao despedida(nome):
+    retorna "Até logo, " + nome + "!"
+fim
+```
+
+### Usar Localmente
+
+Coloque a pasta dentro de `modulos_mambas/` do seu projeto:
+
+```
+meu-projeto/
+├── main.ms
+└── modulos_mambas/
+    └── meu-pacote/
+        ├── index.ms
+        └── pacote.json
+```
+
+```ms
+importar meuPacote de "meu-pacote"
+
+escreva meuPacote.saudacao("Mundo")
+escreva meuPacote.despedida("Mundo")
+```
+
+### Gestor de Pacotes
+
+```bash
+# Instalar um pacote
+mambas instalar nome-do-pacote
+
+# Remover um pacote
+mambas remover nome-do-pacote
+
+# Listar pacotes instalados
+mambas listar
+
+# Procurar pacotes
+mambas procurar
+```
+
+### Partilhar com a Comunidade
+
+1. Garanta que tem `index.ms` e `pacote.json`
+2. Teste localmente em `modulos_mambas/`
+3. Abra uma Issue em: [github.com/Eliobros/mambascript-pacotes](https://github.com/Eliobros/mambascript-pacotes)
+4. Use o título: `[Pacote] nome-do-pacote`
+5. Cole o código do `index.ms` e `pacote.json`
+6. Aguarda aprovação!
 
 ---
 
 ## ⚡ Funções Built-in
 
-### 📅 Função `hoje()`
+### 📅 `hoje()`
 
 Retorna um objecto com a data e hora actuais:
 
-```mambascript
-variavel data = hoje()
+| Método | Descrição |
+|--------|-----------|
+| `mostrarData()` | Data formatada |
+| `mostrarHora()` | Hora formatada |
+| `ano()` | Ano actual |
+| `dia()` | Dia do mês |
+| `horas()` | Horas |
+| `minutos()` | Minutos |
+| `segundos()` | Segundos |
+| `mes()` | Objecto com `numero` e `nome` |
+| `semana()` | Objecto com `numero` e `nome` |
+| `timestamp()` | Timestamp Unix |
+| `formatado()` | Data no formato `DD/MM/AAAA` |
+| `horaFormatada()` | Hora no formato `HH:MM:SS` |
 
+```ms
+variavel data = hoje()
 escreva data.mostrarData()
 escreva data.mostrarHora()
 escreva data.ano()
-```
+escreva data.mes().nome
+escreva data.formatado()
 
-Com fuso horário:
-
-```mambascript
-variavel data = hoje("Africa/Maputo")
-escreva data.mostrarData()
-escreva data.mostrarHora()
-```
-
-### 📖 Função `ler()`
-
-Lê entrada do utilizador:
-
-```mambascript
-escreva "Digite o seu nome:"
-variavel nome = ler()
-escreva "Olá, " + nome
+# Com fuso horário
+variavel dataMZ = hoje("Africa/Maputo")
+escreva dataMZ.horaFormatada()
 ```
 
 ### 📄 Funções JSON
@@ -684,16 +885,16 @@ escreva "Olá, " + nome
 | `json_texto(string)` | Analisa uma string JSON |
 | `json_escrever(arquivo, dados)` | Escreve dados num arquivo JSON |
 
-```mambascript
-# Ler um arquivo JSON
+```ms
+# Ler arquivo JSON
 variavel config = json_ler("config.json")
 escreva config.nome
 
-# Analisar uma string JSON
+# Analisar string JSON
 variavel dados = json_texto('{"nome": "Mamba", "versao": 2}')
 escreva dados.nome
 
-# Escrever um arquivo JSON
+# Escrever arquivo JSON
 variavel info = {nome: "MambaScript", versao: 2}
 json_escrever("saida.json", info)
 ```
@@ -704,31 +905,27 @@ json_escrever("saida.json", info)
 
 ### Exemplo 1: Calculadora Simples
 
-```mambascript
-# Calculadora Simples em MambaScript
-
+```ms
 funcao calculadora(a, operacao, b):
-    se operacao igual "+":
+    se operacao == "+":
         retorna a + b
     fim
-    se operacao igual "-":
+    se operacao == "-":
         retorna a - b
     fim
-    se operacao igual "*":
+    se operacao == "*":
         retorna a * b
     fim
-    se operacao igual "/":
-        se b igual 0:
+    se operacao == "/":
+        se b == 0:
             escreva "Erro: Divisão por zero!"
             retorna nulo
         fim
         retorna a / b
     fim
-    escreva "Operação desconhecida!"
     retorna nulo
 fim
 
-escreva "=== Calculadora MambaScript ==="
 escreva "5 + 3 = " + calculadora(5, "+", 3)
 escreva "10 - 4 = " + calculadora(10, "-", 4)
 escreva "6 * 7 = " + calculadora(6, "*", 7)
@@ -737,27 +934,15 @@ escreva "20 / 4 = " + calculadora(20, "/", 4)
 
 ### Exemplo 2: Gestão de Alunos
 
-```mambascript
-# Sistema de Gestão de Alunos
-
+```ms
 variavel alunos = []
 
 funcao adicionarAluno(nome, nota):
-    variavel aluno = {nome: nome, nota: nota}
-    alunos.adicionar(aluno)
-    escreva "Aluno " + nome + " adicionado com sucesso!"
-fim
-
-funcao calcularMedia():
-    variavel soma = 0
-    para i de 0 ate alunos.tamanho() - 1:
-        soma = soma + alunos[i].nota
-    fim
-    retorna soma / alunos.tamanho()
+    alunos.adicionar({nome: nome, nota: nota})
+    escreva "Aluno " + nome + " adicionado!"
 fim
 
 funcao mostrarResultados():
-    escreva "=== Resultados ==="
     para i de 0 ate alunos.tamanho() - 1:
         variavel status = "Reprovado"
         se alunos[i].nota >= 10:
@@ -767,59 +952,72 @@ funcao mostrarResultados():
     fim
 fim
 
-# Adicionar alunos
 adicionarAluno("Ana", 18)
 adicionarAluno("Carlos", 8)
 adicionarAluno("Maria", 15)
-adicionarAluno("João", 12)
-
-# Mostrar resultados
 mostrarResultados()
-
-# Calcular média
-variavel media = calcularMedia()
-escreva "Média da turma: " + media
 ```
 
-### Exemplo 3: Trabalhando com Arquivos e Módulos
+### Exemplo 3: API REST Completa
 
-```mambascript
-# Exemplo de uso de módulos built-in
+```ms
+importar http de "http"
+importar bd de "mysql"
 
+bd.conectar("localhost", "root", "senha", "escola_db")
+
+variavel handler = funcao(requisicao, resposta):
+    variavel rota = requisicao.url
+
+    resposta.cabecalho("Access-Control-Allow-Origin", "*")
+    resposta.cabecalho("X-Powered-By", "MambaScript")
+
+    se rota == "/":
+        resposta.json(200, {
+            "api": "Escola MambaScript",
+            "versao": "1.0",
+            "rotas": ["/alunos", "/alunos/adicionar"]
+        })
+    senao:
+        se rota == "/alunos":
+            variavel alunos = bd.consultar("SELECT * FROM alunos")
+            resposta.json(200, {"alunos": alunos})
+        senao:
+            resposta.json(404, {"erro": "Rota não encontrada"})
+        fim
+    fim
+fim
+
+variavel servidor = http.criarServidor()
+servidor.aoReceber(handler)
+servidor.escutar(3000)
+escreva "API Escola rodando na porta 3000!"
+```
+
+### Exemplo 4: Trabalhando com Ficheiros e Módulos
+
+```ms
 importar matematica de "matematica"
 importar fs de "fs"
 
-# Gerar relatório matemático
 funcao gerarRelatorio():
     variavel relatorio = "=== Relatório Matemático ===\n"
     relatorio = relatorio + "PI: " + matematica.PI + "\n"
     relatorio = relatorio + "Raiz de 256: " + matematica.raiz(256) + "\n"
     relatorio = relatorio + "2^8: " + matematica.potencia(2, 8) + "\n"
-
-    # Tabuada do 5
-    relatorio = relatorio + "\nTabuada do 5:\n"
     para i de 1 ate 10:
         relatorio = relatorio + "5 x " + i + " = " + (5 * i) + "\n"
     fim
-
     retorna relatorio
 fim
 
 variavel texto = gerarRelatorio()
 escreva texto
-
-# Salvar em arquivo
 fs.escrever("relatorio.txt", texto)
-escreva "Relatório salvo em relatorio.txt!"
+escreva "Relatório salvo!"
 
-# Verificar que foi salvo
-se fs.existe("relatorio.txt"):
-    escreva "Arquivo criado com sucesso!"
-fim
-
-# Data e hora
 variavel agora = hoje()
-escreva "Gerado em: " + agora.mostrarData() + " às " + agora.mostrarHora()
+escreva "Gerado em: " + agora.formatado() + " às " + agora.horaFormatada()
 ```
 
 ---
@@ -850,5 +1048,5 @@ MambaScript é distribuído sob a licença **MIT**. Veja o arquivo [LICENSE](LIC
   Feito com ❤️ em Moçambique por <a href="https://github.com/Eliobros">Habibo Salimo Julio</a>
 </p>
 <p align="center">
-  <strong>MambaScript v2.0.2</strong> — 🐍 A linguagem de programação moçambicana
+  <strong>MambaScript v2.1.0</strong> — 🐍 A linguagem de programação moçambicana
 </p>

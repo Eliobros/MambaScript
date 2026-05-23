@@ -14,20 +14,45 @@ class Evaluator {
         this.builtinModules = {
             'fs': this.createFsModule(),
             'matematica': this.createMathModule(),
-            'caminho': this.createPathModule()
+            'caminho': this.createPathModule(),
+            'http': this.createHttpModule(this),
+            'mysql': this.createMysqlModule()
         };
     }
 
-    execute(ast) {
+    async execute(ast) {
         for (const statement of ast.body) {
-            this.executeStatement(statement);
+            await this.executeStatement(statement);
         }
     }
 
-    executeStatement(node) {
+    async chamarFuncaoMamba(func, argumentosPassados) {
+        const oldVars = { ...this.variables };
+        const oldReturnValue = this.returnValue;
+        this.returnValue = null;
+        this.hasReturned = false;
+
+        for (let i = 0; i < func.params.length; i++) {
+            this.variables[func.params[i]] = argumentosPassados[i];
+        }
+
+        for (const stmt of func.body) {
+            await this.executeStatement(stmt);
+            if (this.hasReturned) break;
+        }
+
+        const result = this.returnValue;
+        this.variables = oldVars;
+        this.returnValue = oldReturnValue;
+        this.hasReturned = false;
+
+        return result;
+    }
+
+    async executeStatement(node) {
         switch (node.type) {
             case 'Print':
-                const printValue = this.evaluate(node.value);
+                const printValue = await this.evaluate(node.value);
                 if (printValue && printValue._type === 'DateObject') {
                     console.log(`Data: ${printValue.mostrarData()} às ${printValue.mostrarHora()}`);
                 } else {
@@ -36,53 +61,48 @@ class Evaluator {
                 break;
 
             case 'VarDeclaration':
-                const varValue = this.evaluate(node.value);
+                const varValue = await this.evaluate(node.value);
                 this.variables[node.name] = varValue;
                 break;
 
             case 'Assignment':
-                // Atribuição simples (variável)
                 if (typeof node.name === 'string') {
                     if (!(node.name in this.variables)) {
                         throw new Error(`Variável não definida: ${node.name}`);
                     }
-                    this.variables[node.name] = this.evaluate(node.value);
-                } 
-                // Atribuição em propriedade (dados.nome = "João")
-                else if (node.name.type === 'PropertyAccess') {
-                    const obj = this.evaluate(node.name.object);
+                    this.variables[node.name] = await this.evaluate(node.value);
+                } else if (node.name.type === 'PropertyAccess') {
+                    const obj = await this.evaluate(node.name.object);
                     if (typeof obj !== 'object' || obj === null) {
                         throw new Error('Tentativa de atribuir propriedade em não-objeto');
                     }
-                    obj[node.name.property] = this.evaluate(node.value);
-                }
-                // Atribuição para Identifier (compatibilidade)
-                else if (node.name.type === 'Identifier') {
+                    obj[node.name.property] = await this.evaluate(node.value);
+                } else if (node.name.type === 'Identifier') {
                     if (!(node.name.name in this.variables)) {
                         throw new Error(`Variável não definida: ${node.name.name}`);
                     }
-                    this.variables[node.name.name] = this.evaluate(node.value);
+                    this.variables[node.name.name] = await this.evaluate(node.value);
                 }
                 break;
 
             case 'If':
-                if (this.evaluate(node.condition)) {
+                if (await this.evaluate(node.condition)) {
                     for (const stmt of node.body) {
-                        this.executeStatement(stmt);
+                        await this.executeStatement(stmt);
                         if (this.hasReturned) return;
                     }
                 } else if (node.elseBody) {
                     for (const stmt of node.elseBody) {
-                        this.executeStatement(stmt);
+                        await this.executeStatement(stmt);
                         if (this.hasReturned) return;
                     }
                 }
                 break;
 
             case 'While':
-                while (this.evaluate(node.condition)) {
+                while (await this.evaluate(node.condition)) {
                     for (const stmt of node.body) {
-                        this.executeStatement(stmt);
+                        await this.executeStatement(stmt);
                         if (this.hasReturned) return;
                     }
                 }
@@ -96,51 +116,51 @@ class Evaluator {
                 break;
 
             case 'Return':
-                this.returnValue = this.evaluate(node.value);
+                this.returnValue = await this.evaluate(node.value);
                 this.hasReturned = true;
-                  break;
+                break;
 
             case 'For':
-                const startVal = this.evaluate(node.start);
-                const endVal = this.evaluate(node.end);
+                const startVal = await this.evaluate(node.start);
+                const endVal = await this.evaluate(node.end);
                 for (let i = startVal; i <= endVal; i++) {
                     this.variables[node.varName] = i;
                     for (const stmt of node.body) {
-                        this.executeStatement(stmt);
+                        await this.executeStatement(stmt);
                         if (this.hasReturned) return;
                     }
                 }
                 break;
 
             case 'Import':
-                this.executeImport(node);
+                await this.executeImport(node);
                 break;
 
             case 'ExpressionStatement':
-                this.evaluate(node.expression);
+                await this.evaluate(node.expression);
                 break;
-                
-                case 'TryCatch':
-    try {
-        for (const stmt of node.body) {
-            this.executeStatement(stmt);
-            if (this.hasReturned) return;
-        }
-    } catch (e) {
-        this.variables[node.errorVar] = e.message;
-        for (const stmt of node.catchBody) {
-            this.executeStatement(stmt);
-            if (this.hasReturned) return;
-        }
-    }
-    break;
+
+            case 'TryCatch':
+                try {
+                    for (const stmt of node.body) {
+                        await this.executeStatement(stmt);
+                        if (this.hasReturned) return;
+                    }
+                } catch (e) {
+                    this.variables[node.errorVar] = e.message;
+                    for (const stmt of node.catchBody) {
+                        await this.executeStatement(stmt);
+                        if (this.hasReturned) return;
+                    }
+                }
+                break;
 
             default:
                 throw new Error(`Statement desconhecido: ${node.type}`);
         }
     }
 
-    evaluate(node) {
+    async evaluate(node) {
         if (!node) throw new Error('Nó inválido');
 
         switch (node.type) {
@@ -163,67 +183,58 @@ class Evaluator {
                 return this.variables[node.name];
 
             case 'ArrayLiteral':
-                return node.elements.map(el => this.evaluate(el));
+                const elements = [];
+                for (const el of node.elements) {
+                    elements.push(await this.evaluate(el));
+                }
+                return elements;
 
             case 'ObjectLiteral':
                 const objectLiteral = {};
                 for (const [key, valueNode] of Object.entries(node.properties)) {
-                    objectLiteral[key] = this.evaluate(valueNode);
+                    objectLiteral[key] = await this.evaluate(valueNode);
                 }
                 return objectLiteral;
 
+            case 'FunctionLiteral':
+                return {
+                    _type: 'MambaFunction',
+                    params: node.params,
+                    body: node.body
+                };
 
             case 'ArrayAccess':
-                const array = this.evaluate(node.array);
-                const index = this.evaluate(node.index);
-
-                if (!Array.isArray(array)) {
-                    throw new Error('Tentativa de acessar índice em não-array');
-                }
-                if (typeof index !== 'number') {
-                    throw new Error('Índice deve ser um número');
-                }
-                if (index < 0 || index >= array.length) {
-                    throw new Error(`Índice ${index} fora dos limites (tamanho: ${array.length})`);
-                }
-
+                const array = await this.evaluate(node.array);
+                const index = await this.evaluate(node.index);
+                if (!Array.isArray(array)) throw new Error('Tentativa de acessar índice em não-array');
+                if (typeof index !== 'number') throw new Error('Índice deve ser um número');
+                if (index < 0 || index >= array.length) throw new Error(`Índice ${index} fora dos limites (tamanho: ${array.length})`);
                 return array[index];
 
             case 'PropertyAccess':
-                const object = this.evaluate(node.object);
-                
+                const object = await this.evaluate(node.object);
                 if (object === null || object === undefined) {
                     throw new Error(`Tentativa de acessar propriedade "${node.property}" em valor nulo`);
                 }
-                
-                // Se for objeto JavaScript (JSON)
                 if (typeof object === 'object' && !Array.isArray(object) && !object._type) {
                     if (!(node.property in object)) {
                         throw new Error(`Propriedade "${node.property}" não existe no objeto`);
                     }
                     return object[node.property];
                 }
-                
                 throw new Error(`O tipo ${typeof object} não possui propriedades acessíveis`);
 
             case 'BinaryOp':
-                const left = this.evaluate(node.left);
-                const right = this.evaluate(node.right);
-
+                const left = await this.evaluate(node.left);
+                const right = await this.evaluate(node.right);
                 if (node.operator === 'PLUS') {
-                    if (typeof left === 'number' && typeof right === 'number') {
-                        return left + right;
-                    }
-                    if (typeof left === 'string' || typeof right === 'string') {
-                        return String(left) + String(right);
-                    }
-                    throw new Error(`Erro de Tipo: Não é possível somar ${typeof left} com ${typeof right}. Use .paraTexto() ou .paraNumero().`);
+                    if (typeof left === 'number' && typeof right === 'number') return left + right;
+                    if (typeof left === 'string' || typeof right === 'string') return String(left) + String(right);
+                    throw new Error(`Erro de Tipo: Não é possível somar ${typeof left} com ${typeof right}.`);
                 }
-
                 if (typeof left !== 'number' || typeof right !== 'number') {
                     throw new Error(`Operação ${node.operator} permitida apenas entre números.`);
                 }
-
                 switch (node.operator) {
                     case 'MINUS': return left - right;
                     case 'MULT': return left * right;
@@ -232,88 +243,64 @@ class Evaluator {
                 }
 
             case 'Comparison':
-                const leftComp = this.evaluate(node.left);
-                const rightComp = this.evaluate(node.right);
-
+                const leftComp = await this.evaluate(node.left);
+                const rightComp = await this.evaluate(node.right);
                 switch (node.operator) {
-                    case 'GT':
-                    case 'GREATER':
-                        return leftComp > rightComp;
-
-                    case 'LT':
-                    case 'LESS':
-                        return leftComp < rightComp;
-
-                    case 'EQ':
-                    case 'EQUALS_COMP':
-                        return leftComp === rightComp;
-
-                    case 'GTE':
-                    case 'GREATER_EQUAL':
-                        return leftComp >= rightComp;
-
-                    case 'LTE':
-                    case 'LESS_EQUAL':
-                        return leftComp <= rightComp;
-
-                    default:
-                        throw new Error(`Comparação desconhecida: ${node.operator}`);
+                    case 'GT': case 'GREATER': return leftComp > rightComp;
+                    case 'LT': case 'LESS': return leftComp < rightComp;
+                    case 'EQ': case 'EQUALS_COMP': return leftComp === rightComp;
+                    case 'GTE': case 'GREATER_EQUAL': return leftComp >= rightComp;
+                    case 'LTE': case 'LESS_EQUAL': return leftComp <= rightComp;
+                    default: throw new Error(`Comparação desconhecida: ${node.operator}`);
                 }
 
             case 'FunctionCall':
                 if (node.name in this.builtinFunctions) {
-                    const args = node.args.map(arg => this.evaluate(arg));
-                    return this.builtinFunctions[node.name](...args);
+                    const args = [];
+                    for (const arg of node.args) args.push(await this.evaluate(arg));
+                    return await this.builtinFunctions[node.name](...args);
                 }
                 if (!(node.name in this.functions)) {
                     throw new Error(`Função não definida: ${node.name}`);
                 }
                 const func = this.functions[node.name];
-const oldVars = { ...this.variables };
-const oldReturnValue = this.returnValue;
-this.returnValue = null;
-this.hasReturned = false;
-
-this.variables = { ...this.variables };
-for (let i = 0; i < func.params.length; i++) {
-    this.variables[func.params[i]] = this.evaluate(node.args[i]);
-}
-for (const stmt of func.body) {
-    this.executeStatement(stmt);
-    if (this.hasReturned) break;
-}
-const result = this.returnValue;
-this.variables = oldVars;
-this.returnValue = oldReturnValue;
-this.hasReturned = false;
-
-return result !== undefined ? result : undefined;
+                const oldVars = { ...this.variables };
+                const oldReturnValue = this.returnValue;
+                this.returnValue = null;
+                this.hasReturned = false;
+                this.variables = { ...this.variables };
+                for (let i = 0; i < func.params.length; i++) {
+                    this.variables[func.params[i]] = await this.evaluate(node.args[i]);
+                }
+                for (const stmt of func.body) {
+                    await this.executeStatement(stmt);
+                    if (this.hasReturned) break;
+                }
+                const result = this.returnValue;
+                this.variables = oldVars;
+                this.returnValue = oldReturnValue;
+                this.hasReturned = false;
+                return result !== undefined ? result : undefined;
 
             case 'LogicalOp':
-                if (node.operator === 'AND') {
-                    return this.evaluate(node.left) && this.evaluate(node.right);
-                }
-                if (node.operator === 'OR') {
-                    return this.evaluate(node.left) || this.evaluate(node.right);
-                }
+                if (node.operator === 'AND') return (await this.evaluate(node.left)) && (await this.evaluate(node.right));
+                if (node.operator === 'OR') return (await this.evaluate(node.left)) || (await this.evaluate(node.right));
                 throw new Error(`Operador lógico desconhecido: ${node.operator}`);
 
             case 'UnaryOp':
-                if (node.operator === 'NOT') {
-                    return !this.evaluate(node.operand);
-                }
+                if (node.operator === 'NOT') return !(await this.evaluate(node.operand));
                 throw new Error(`Operador unário desconhecido: ${node.operator}`);
 
             case 'MethodCall':
-                const obj = this.evaluate(node.object);
-                return this.callMethod(obj, node.method, node.args);
+                const obj = await this.evaluate(node.object);
+                return await this.callMethod(obj, node.method, node.args);
 
             default:
                 throw new Error(`Tipo de nó desconhecido: ${node.type}`);
         }
     }
 
-    callMethod(obj, methodName, args) {
+    async callMethod(obj, methodName, args) {
         // STRING METHODS
         if (typeof obj === 'string') {
             if (methodName === 'paraNumero') {
@@ -321,177 +308,54 @@ return result !== undefined ? result : undefined;
                 if (isNaN(n)) throw new Error(`❌ Erro MambaScript: "${obj}" não é um número válido.`);
                 return n;
             }
-            if (methodName === 'tamanho') {
-                return obj.length;
-            }
-            if (methodName === 'maiuscula') {
-                return obj.toUpperCase();
-            }
-            if (methodName === 'minuscula') {
-                return obj.toLowerCase();
-            }
+            if (methodName === 'tamanho') return obj.length;
+            if (methodName === 'maiuscula') return obj.toUpperCase();
+            if (methodName === 'minuscula') return obj.toLowerCase();
         }
 
         // NUMBER METHODS
         if (typeof obj === 'number') {
-            if (methodName === 'paraTexto') {
-                return String(obj);
-            }
+            if (methodName === 'paraTexto') return String(obj);
         }
 
         // ARRAY METHODS
         if (Array.isArray(obj)) {
-            if (methodName === 'tamanho') {
-                return obj.length;
-            }
-            if (methodName === 'adicionar') {
-                const item = this.evaluate(args[0]);
-                obj.push(item);
-                return undefined;
-            }
+            if (methodName === 'tamanho') return obj.length;
+            if (methodName === 'adicionar') { obj.push(await this.evaluate(args[0])); return undefined; }
             if (methodName === 'remover') {
-                const index = this.evaluate(args[0]);
-                if (typeof index !== 'number') {
-                    throw new Error('Índice deve ser um número');
-                }
-                if (index < 0 || index >= obj.length) {
-                    throw new Error(`Índice ${index} fora dos limites`);
-                }
+                const index = await this.evaluate(args[0]);
+                if (typeof index !== 'number') throw new Error('Índice deve ser um número');
+                if (index < 0 || index >= obj.length) throw new Error(`Índice ${index} fora dos limites`);
                 obj.splice(index, 1);
                 return undefined;
             }
             if (methodName === 'pegar') {
-                const index = this.evaluate(args[0]);
-                if (typeof index !== 'number') {
-                    throw new Error('Índice deve ser um número');
-                }
-                if (index < 0 || index >= obj.length) {
-                    throw new Error(`Índice ${index} fora dos limites`);
-                }
+                const index = await this.evaluate(args[0]);
+                if (typeof index !== 'number') throw new Error('Índice deve ser um número');
+                if (index < 0 || index >= obj.length) throw new Error(`Índice ${index} fora dos limites`);
                 return obj[index];
             }
-            if (methodName === 'contem') {
-                const item = this.evaluate(args[0]);
-                return obj.includes(item);
-            }
+            if (methodName === 'contem') { return obj.includes(await this.evaluate(args[0])); }
             if (methodName === 'juntar') {
-                const separator = args[0] ? this.evaluate(args[0]) : ',';
+                const separator = args[0] ? await this.evaluate(args[0]) : ',';
                 return obj.join(separator);
             }
         }
 
-        // DATEOBJECT METHODS
         if (!obj || typeof obj !== 'object') {
             throw new Error(`O valor do tipo ${typeof obj} não possui o método "${methodName}"`);
         }
-
         if (!(methodName in obj)) {
             throw new Error(`Método não encontrado: ${methodName}`);
         }
 
         const method = obj[methodName];
-        const evaluatedArgs = args.map(arg => this.evaluate(arg));
-        return method(...evaluatedArgs);
+        const evaluatedArgs = [];
+        for (const arg of args) evaluatedArgs.push(await this.evaluate(arg));
+        return await method.call(obj, ...evaluatedArgs);
     }
 
-        createDateObject(timezone) {
-        const now = new Date();
-
-        const getLocalDate = () => {
-            if (!timezone) return now;
-
-            const parts = new Intl.DateTimeFormat('en-US', {
-                timeZone: timezone,
-                year: 'numeric', month: '2-digit', day: '2-digit',
-                hour: '2-digit', minute: '2-digit', second: '2-digit',
-                hour12: false
-            }).formatToParts(now);
-
-            const get = (type) => parseInt(parts.find(p => p.type === type).value);
-
-            return new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
-        };
-
-        const localDate = getLocalDate();
-
-        const nomesMeses = [
-            "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
-            "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
-        ];
-
-        const nomesSemana = [
-            "Domingo", "Segunda-feira", "Terça-feira", "Quarta-feira",
-            "Quinta-feira", "Sexta-feira", "Sábado"
-        ];
-
-        return {
-            _type: 'DateObject',
-
-            // ── Exibição ──────────────────────────────
-            mostrarHora: () => localDate.toLocaleTimeString('pt-BR'),
-            mostrarData: () => localDate.toLocaleDateString('pt-BR'),
-
-            // ── Simples ───────────────────────────────
-            ano: () => localDate.getFullYear(),
-            dia: () => localDate.getDate(),
-            horas: () => localDate.getHours(),
-            minutos: () => localDate.getMinutes(),
-            segundos: () => localDate.getSeconds(),
-
-            // ── Mês (número ou nome) ──────────────────
-            mes: () => ({
-                numero: localDate.getMonth() + 1,
-                nome: nomesMeses[localDate.getMonth()]
-            }),
-
-            // ── Semana (número ou nome) ───────────────
-            semana: () => ({
-                numero: localDate.getDay(),
-                nome: nomesSemana[localDate.getDay()]
-            }),
-
-            // ── Extras ────────────────────────────────
-            timestamp: () => now.getTime(),
-            formatado: () => `${String(localDate.getDate()).padStart(2, '0')}/${String(localDate.getMonth() + 1).padStart(2, '0')}/${localDate.getFullYear()}`,
-            horaFormatada: () => `${String(localDate.getHours()).padStart(2, '0')}:${String(localDate.getMinutes()).padStart(2, '0')}:${String(localDate.getSeconds()).padStart(2, '0')}`
-        };
-    }
-
-
-    lerInput() {
-        const prompt = require('prompt-sync')({ sigint: true });
-        return prompt('');
-    }
-
-    jsonLer(arquivo) {
-        const fs = require('fs');
-        try {
-            const conteudo = fs.readFileSync(arquivo, 'utf-8');
-            return JSON.parse(conteudo);
-        } catch (erro) {
-            throw new Error(`❌ Erro ao ler JSON: ${erro.message}`);
-        }
-    }
-
-    jsonTexto(textoJson) {
-        try {
-            return JSON.parse(textoJson);
-        } catch (erro) {
-            throw new Error(`❌ Erro ao parsear JSON: ${erro.message}`);
-        }
-    }
-
-    jsonEscrever(arquivo, dados) {
-        const fs = require('fs');
-        try {
-            fs.writeFileSync(arquivo, JSON.stringify(dados, null, 2), 'utf-8');
-            return undefined;
-        } catch (erro) {
-            throw new Error(`❌ Erro ao escrever JSON: ${erro.message}`);
-        }
-    }
-
-    executeImport(node) {
+    async executeImport(node) {
         const { name, source } = node;
 
         if (this.builtinModules[source]) {
@@ -510,12 +374,11 @@ return result !== undefined ? result : undefined;
 
         let resolvedPath = null;
         const nomeNormalizado = source.endsWith('.ms') ? source : source + '.ms';
-
-const candidates = [
-    path.resolve(baseDir, nomeNormalizado),
-    path.resolve(baseDir, 'modulos_mambas', nomeNormalizado),
-    path.resolve(baseDir, 'modulos_mambas', source, 'index.ms'),
-];
+        const candidates = [
+            path.resolve(baseDir, nomeNormalizado),
+            path.resolve(baseDir, 'modulos_mambas', nomeNormalizado),
+            path.resolve(baseDir, 'modulos_mambas', source, 'index.ms'),
+        ];
 
         for (const candidate of candidates) {
             if (fs.existsSync(candidate)) {
@@ -535,22 +398,21 @@ const candidates = [
         const ast = parser.parse();
 
         const moduleEvaluator = new Evaluator(resolvedPath);
-        moduleEvaluator.execute(ast);
+        await moduleEvaluator.execute(ast);
 
         const moduleExports = {};
-        for (const [key, value] of Object.entries(moduleEvaluator.functions)) {
-            moduleExports[key] = (...args) => {
+        for (const [key] of Object.entries(moduleEvaluator.functions)) {
+            moduleExports[key] = async (...args) => {
                 const evalCopy = new Evaluator(resolvedPath);
                 evalCopy.functions = { ...moduleEvaluator.functions };
                 evalCopy.variables = { ...moduleEvaluator.variables };
                 evalCopy.returnValue = null;
-
                 const func = evalCopy.functions[key];
                 for (let i = 0; i < func.params.length; i++) {
                     evalCopy.variables[func.params[i]] = args[i];
                 }
                 for (const stmt of func.body) {
-                    evalCopy.executeStatement(stmt);
+                    await evalCopy.executeStatement(stmt);
                     if (evalCopy.hasReturned) break;
                 }
                 return evalCopy.returnValue;
@@ -566,30 +428,10 @@ const candidates = [
     createFsModule() {
         const fs = require('fs');
         return {
-            ler: (arquivo) => {
-                try {
-                    return fs.readFileSync(arquivo, 'utf-8');
-                } catch (e) {
-                    throw new Error(`❌ Erro ao ler arquivo: ${e.message}`);
-                }
-            },
-            escrever: (arquivo, conteudo) => {
-                try {
-                    fs.writeFileSync(arquivo, conteudo, 'utf-8');
-                    return undefined;
-                } catch (e) {
-                    throw new Error(`❌ Erro ao escrever arquivo: ${e.message}`);
-                }
-            },
+            ler: (arquivo) => { try { return fs.readFileSync(arquivo, 'utf-8'); } catch (e) { throw new Error(`❌ Erro ao ler arquivo: ${e.message}`); } },
+            escrever: (arquivo, conteudo) => { try { fs.writeFileSync(arquivo, conteudo, 'utf-8'); } catch (e) { throw new Error(`❌ Erro ao escrever arquivo: ${e.message}`); } },
             existe: (arquivo) => fs.existsSync(arquivo),
-            apagar: (arquivo) => {
-                try {
-                    fs.unlinkSync(arquivo);
-                    return undefined;
-                } catch (e) {
-                    throw new Error(`❌ Erro ao apagar arquivo: ${e.message}`);
-                }
-            }
+            apagar: (arquivo) => { try { fs.unlinkSync(arquivo); } catch (e) { throw new Error(`❌ Erro ao apagar arquivo: ${e.message}`); } }
         };
     }
 
@@ -618,7 +460,196 @@ const candidates = [
             absoluto: (caminho) => path.resolve(caminho)
         };
     }
+
+    createMysqlModule() {
+        let mysql2;
+        try {
+            mysql2 = require('mysql2/promise');
+        } catch (e) {
+            return new Proxy({}, {
+                get: () => () => { throw new Error(`❌ Módulo "mysql" requer mysql2. Execute: npm install mysql2`); }
+            });
+        }
+
+        let conexao = null;
+
+        return {
+            conectar: async (host, usuario, senha, base) => {
+                try {
+                    conexao = await mysql2.createConnection({ host, user: usuario, password: senha, database: base });
+                    return { ok: true, mensagem: "Conexão estabelecida!" };
+                } catch (e) {
+                    throw new Error(`❌ Erro ao conectar ao MySQL: ${e.message}`);
+                }
+            },
+
+            consultar: async (sql, parametros) => {
+                if (!conexao) throw new Error(`❌ Chame bd.conectar() antes de consultar`);
+                try {
+                    const [linhas] = await conexao.execute(sql, parametros || []);
+                    return linhas;
+                } catch (e) {
+                    throw new Error(`❌ Erro na consulta: ${e.message}`);
+                }
+            },
+
+            executar: async (sql, parametros) => {
+                if (!conexao) throw new Error(`❌ Chame bd.executar() antes de executar`);
+                try {
+                    const [resultado] = await conexao.execute(sql, parametros || []);
+                    return {
+                        afetadas: resultado.affectedRows,
+                        inseridoId: resultado.insertId,
+                        ok: resultado.affectedRows > 0
+                    };
+                } catch (e) {
+                    throw new Error(`❌ Erro ao executar: ${e.message}`);
+                }
+            },
+
+            fechar: async () => {
+                if (conexao) { await conexao.end(); conexao = null; }
+            }
+        };
+    }
+
+    createHttpModule(evaluator) {
+        const { execSync } = require('child_process');
+
+        const request = (method, url, corpo, cabecalhos) => {
+            try {
+                let cmd = `curl -s -w "\\n__STATUS__%{http_code}" -X ${method}`;
+                if (cabecalhos && typeof cabecalhos === 'object') {
+                    for (const [key, val] of Object.entries(cabecalhos)) cmd += ` -H "${key}: ${val}"`;
+                }
+                if (corpo) {
+                    const corpoStr = typeof corpo === 'object' ? JSON.stringify(corpo) : String(corpo);
+                    cmd += ` -d '${corpoStr.replace(/'/g, "'\\''")}'`;
+                    if (!cabecalhos || !cabecalhos['Content-Type']) cmd += ` -H "Content-Type: application/json"`;
+                }
+                cmd += ` "${url}"`;
+                const output = execSync(cmd, { encoding: 'utf-8' });
+                const parts = output.split('\n__STATUS__');
+                const status = parseInt(parts[1]) || 0;
+                const corpoResposta = parts[0].trim();
+                let dados = corpoResposta;
+                try { dados = JSON.parse(corpoResposta); } catch {}
+                return { status, corpo: dados, texto: corpoResposta, ok: status >= 200 && status < 300 };
+            } catch (e) {
+                throw new Error(`❌ Erro HTTP: ${e.message}`);
+            }
+        };
+
+        return {
+            get: (url, cabecalhos) => request('GET', url, null, cabecalhos),
+            post: (url, corpo, cabecalhos) => request('POST', url, corpo, cabecalhos),
+            put: (url, corpo, cabecalhos) => request('PUT', url, corpo, cabecalhos),
+            apagar: (url, cabecalhos) => request('DELETE', url, null, cabecalhos),
+
+            criarServidor: () => {
+                return {
+                    callbackMamba: null,
+                    aoReceber: function(funcaoUsuario) { this.callbackMamba = funcaoUsuario; },
+                    escutar: function(porta) {
+                        const httpNativo = require('http');
+                        const servidorNode = httpNativo.createServer((req, res) => {
+                            let corpoRequisicao = '';
+                            req.on('data', chunk => { corpoRequisicao += chunk; });
+                            req.on('end', async () => {
+                                let corpoParseado = corpoRequisicao;
+                                try { corpoParseado = JSON.parse(corpoRequisicao); } catch {}
+
+                                const urlObj = new URL(req.url, `http://localhost:${porta}`);
+                                const params = {};
+                                urlObj.searchParams.forEach((val, chave) => { params[chave] = val; });
+
+                                const requisicaoMamba = {
+                                    url: urlObj.pathname,
+                                    metodo: req.method,
+                                    corpo: corpoParseado,
+                                    params: params,
+                                    cabecalhos: req.headers
+                                };
+
+                                const respostaMamba = {
+                                    enviar: (status, conteudo) => {
+                                        const tipo = typeof conteudo === 'object' ? 'application/json' : 'text/plain; charset=utf-8';
+                                        const saida = typeof conteudo === 'object' ? JSON.stringify(conteudo) : String(conteudo);
+                                        res.writeHead(status, { 'Content-Type': tipo });
+                                        res.end(saida);
+                                    },
+                                    json: (status, conteudo) => {
+                                        res.writeHead(status, { 'Content-Type': 'application/json' });
+                                        res.end(JSON.stringify(conteudo));
+                                    },
+                                    cabecalho: (chave, valor) => { res.setHeader(chave, valor); },
+                                    redirecionar: (url) => { res.writeHead(302, { 'Location': url }); res.end(); }
+                                };
+
+                                if (this.callbackMamba && this.callbackMamba._type === 'MambaFunction') {
+                                    await evaluator.chamarFuncaoMamba(this.callbackMamba, [requisicaoMamba, respostaMamba]);
+                                }
+                            });
+                        });
+                        servidorNode.listen(porta);
+                    }
+                };
+            }
+        };
+    }
+
+    createDateObject(timezone) {
+        const now = new Date();
+        const getLocalDate = () => {
+            if (!timezone) return now;
+            const parts = new Intl.DateTimeFormat('en-US', {
+                timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+            }).formatToParts(now);
+            const get = (type) => parseInt(parts.find(p => p.type === type).value);
+            return new Date(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+        };
+        const localDate = getLocalDate();
+        const nomesMeses = ["Janeiro","Fevereiro","Março","Abril","Maio","Junho","Julho","Agosto","Setembro","Outubro","Novembro","Dezembro"];
+        const nomesSemana = ["Domingo","Segunda-feira","Terça-feira","Quarta-feira","Quinta-feira","Sexta-feira","Sábado"];
+        return {
+            _type: 'DateObject',
+            mostrarHora: () => localDate.toLocaleTimeString('pt-BR'),
+            mostrarData: () => localDate.toLocaleDateString('pt-BR'),
+            ano: () => localDate.getFullYear(),
+            dia: () => localDate.getDate(),
+            horas: () => localDate.getHours(),
+            minutos: () => localDate.getMinutes(),
+            segundos: () => localDate.getSeconds(),
+            mes: () => ({ numero: localDate.getMonth() + 1, nome: nomesMeses[localDate.getMonth()] }),
+            semana: () => ({ numero: localDate.getDay(), nome: nomesSemana[localDate.getDay()] }),
+            timestamp: () => now.getTime(),
+            formatado: () => `${String(localDate.getDate()).padStart(2,'0')}/${String(localDate.getMonth()+1).padStart(2,'0')}/${localDate.getFullYear()}`,
+            horaFormatada: () => `${String(localDate.getHours()).padStart(2,'0')}:${String(localDate.getMinutes()).padStart(2,'0')}:${String(localDate.getSeconds()).padStart(2,'0')}`
+        };
+    }
+
+    lerInput() {
+        const prompt = require('prompt-sync')({ sigint: true });
+        return prompt('');
+    }
+
+    jsonLer(arquivo) {
+        const fs = require('fs');
+        try { return JSON.parse(fs.readFileSync(arquivo, 'utf-8')); }
+        catch (e) { throw new Error(`❌ Erro ao ler JSON: ${e.message}`); }
+    }
+
+    jsonTexto(textoJson) {
+        try { return JSON.parse(textoJson); }
+        catch (e) { throw new Error(`❌ Erro ao parsear JSON: ${e.message}`); }
+    }
+
+    jsonEscrever(arquivo, dados) {
+        const fs = require('fs');
+        try { fs.writeFileSync(arquivo, JSON.stringify(dados, null, 2), 'utf-8'); }
+        catch (e) { throw new Error(`❌ Erro ao escrever JSON: ${e.message}`); }
+    }
 }
 
 module.exports = Evaluator;
-

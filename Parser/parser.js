@@ -405,7 +405,38 @@ class Parser {
         if (token.type === 'LBRACE') {
             return this.objectLiteral();
         }
+        
+                // ✅ FUNÇÃO ANÔNIMA / CALLBACK - NOVO!
+        if (token.type === 'FUNCTION') {
+            this.advance(); // Pula o token 'funcao'
+            
+            this.expect('LPAREN'); // Espera o '('
+            const params = [];
+            while (this.currentToken && this.currentToken.type !== 'RPAREN') {
+                params.push(this.expect('IDENTIFIER').value);
+                if (this.currentToken.type === 'COMMA') {
+                    this.advance();
+                }
+            }
+            this.expect('RPAREN'); // Espera o ')'
+            
+            this.expect('COLON'); // Espera o ':' (ou mude para o caractere que sua linguagem usa após os parâmetros)
 
+            const body = [];
+            // Lê o corpo da função até encontrar o token 'fim'
+            while (this.currentToken && this.currentToken.type !== 'END') { 
+                body.push(this.statement());
+            }
+            this.expect('END'); // Consome o token 'fim'
+
+            return {
+                type: 'FunctionLiteral', // Nome exato que colocamos no passo anterior do seu Evaluator!
+                params: params,
+                body: body
+            };
+        }
+
+        
         if (token.type === 'IDENTIFIER') {
             let result = { type: 'Identifier', name: token.value };
             this.advance();

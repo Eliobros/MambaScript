@@ -36,14 +36,15 @@
     "node": ">=14.0.0"
   },
   "dependencies": {
+    "mysql2": "^3.22.3",
     "prompt-sync": "^4.2.0"
   },
-   "pkg": {
+  "pkg": {
     "scripts": [
-  "Lexer/lexer.js",
-  "Parser/parser.js",
-  "Evaluator/evaluate.js"
-],
+      "Lexer/lexer.js",
+      "Parser/parser.js",
+      "Evaluator/evaluate.js"
+    ],
     "assets": [
       "node_modules/prompt-sync/**/*"
     ],
