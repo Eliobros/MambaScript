@@ -24,7 +24,11 @@ if (comando === 'instalar') {
     ajuda();
 } else if (!comando) {
     ajuda();
-} else {
+}else if (comando === '--versao' || comando === '-v') {
+    const pkg = require('./package.json');
+    console.log(`MambaScript v${pkg.version}`);
+    process.exit(0);
+}else {
     const filename = comando;
     const fullPath = path.isAbsolute(filename)
         ? filename
