@@ -5,7 +5,8 @@ main.ms
 entrada.ms
 server.js
 index.js
-
+*.ms
+Evaluator/*.backup
 # Git
 .git
 .gitignore
