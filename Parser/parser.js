@@ -264,12 +264,28 @@ class Parser {
     }
 
     importStatement() {
-        this.advance(); // pular 'importar'
-        const name = this.expect('IDENTIFIER').value;
+    this.advance(); // pular 'importar'
+
+    if (this.currentToken.type === 'LBRACE') {
+        this.advance();
+        const names = [];
+        while (this.currentToken.type !== 'RBRACE') {
+            names.push(this.expect('IDENTIFIER').value);
+            if (this.currentToken.type === 'COMMA') {
+                this.advance();
+            }
+        }
+        this.advance();
         this.expect('DE');
         const source = this.expect('STRING').value;
-        return { type: 'Import', name, source };
+        return { type: 'ImportNamed', names, source };
     }
+
+    const name = this.expect('IDENTIFIER').value;
+    this.expect('DE');
+    const source = this.expect('STRING').value;
+    return { type: 'Import', name, source };
+}
 
     assignmentStatement() {
         const name = this.expect('IDENTIFIER').value;

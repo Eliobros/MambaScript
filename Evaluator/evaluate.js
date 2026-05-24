@@ -59,6 +59,10 @@ class Evaluator {
                     console.log(printValue);
                 }
                 break;
+                
+            case 'ImportNamed':
+    await this.executeImportNamed(node);
+    break;
 
             case 'VarDeclaration':
                 const varValue = await this.evaluate(node.value);
@@ -253,6 +257,8 @@ class Evaluator {
                     case 'LTE': case 'LESS_EQUAL': return leftComp <= rightComp;
                     default: throw new Error(`Comparação desconhecida: ${node.operator}`);
                 }
+                
+              
 
             case 'FunctionCall':
                 if (node.name in this.builtinFunctions) {
@@ -354,6 +360,20 @@ class Evaluator {
         for (const arg of args) evaluatedArgs.push(await this.evaluate(arg));
         return await method.call(obj, ...evaluatedArgs);
     }
+    
+    async executeImportNamed(node) {
+    const { names, source } = node;
+    const tempName = `__temp_${source}__`;
+    await this.executeImport({ name: tempName, source });
+    const modulo = this.variables[tempName];
+    delete this.variables[tempName];
+    for (const nome of names) {
+        if (!(nome in modulo)) {
+            throw new Error(`❌ "${nome}" não existe no módulo "${source}"`);
+        }
+        this.variables[nome] = modulo[nome];
+    }
+}
 
     async executeImport(node) {
         const { name, source } = node;
@@ -377,6 +397,7 @@ class Evaluator {
         const candidates = [
             path.resolve(baseDir, nomeNormalizado),
             path.resolve(baseDir, 'modulos_mambas', nomeNormalizado),
+            path.resolve(baseDir, source, 'index.ms'),
             path.resolve(baseDir, 'modulos_mambas', source, 'index.ms'),
         ];
 
@@ -424,6 +445,8 @@ class Evaluator {
 
         this.variables[name] = moduleExports;
     }
+    
+    
 
     createFsModule() {
         const fs = require('fs');
@@ -444,7 +467,13 @@ class Evaluator {
             arredondar: (n) => Math.round(n),
             teto: (n) => Math.ceil(n),
             chao: (n) => Math.floor(n),
-            aleatorio: () => Math.random(),
+            aleatorio: (min, max) => {
+    if (min !== undefined && max !== undefined) {
+        return Math.floor(Math.random() * (max - min + 1)) + min;
+    }
+    return Math.random();
+}
+,
             seno: (n) => Math.sin(n),
             cosseno: (n) => Math.cos(n)
         };
