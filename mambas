@@ -4,10 +4,12 @@ const fs = require('fs');
 const path = require('path');
 
 const scriptDir = __dirname;
+
 const Lexer     = require(path.join(scriptDir, 'Lexer', 'lexer'));
 const Parser    = require(path.join(scriptDir, 'Parser', 'parser'));
 const Evaluator = require(path.join(scriptDir, 'Evaluator', 'evaluate'));
 const { instalar, remover, listar, procurar, ajuda } = require(path.join(scriptDir, 'Instalador', 'instalador'));
+const { publicar } = require(path.join(scriptDir, 'Instalador', 'publicador'));
 
 const args = process.argv.slice(2);
 const comando = args[0];
@@ -19,16 +21,28 @@ if (comando === 'instalar') {
 } else if (comando === 'listar') {
     listar();
 } else if (comando === 'procurar') {
-    procurar();
-} else if (comando === 'ajuda' || comando === '--ajuda' || comando === '-a') {
+    procurar(args[1]);
+} else if (comando === 'publicar') {
+    publicar();
+}else if (comando === 'login') {
+    const { salvarToken } = require(path.join(scriptDir, 'Instalador', 'publicador'));
+    if (!args[1]) {
+        console.error('❌ Uso: mambas login <token>');
+        process.exit(1);
+    }
+    salvarToken(args[1]);
+}else if (comando === 'ajuda' || comando === '--ajuda' || comando === '-a') {
     ajuda();
-} else if (!comando) {
-    ajuda();
-}else if (comando === '--versao' || comando === '-v') {
+}else if (comando === 'whoami') {
+    const { whoami } = require(path.join(scriptDir, 'Instalador', 'instalador'));
+    whoami();
+} else if (comando === '--versao' || comando === '-v') {
     const pkg = require('./package.json');
     console.log(`MambaScript v${pkg.version}`);
     process.exit(0);
-}else {
+} else if (!comando) {
+    ajuda();
+} else {
     const filename = comando;
     const fullPath = path.isAbsolute(filename)
         ? filename
@@ -42,16 +56,16 @@ if (comando === 'instalar') {
     const code = fs.readFileSync(fullPath, 'utf-8');
 
     (async () => {
-    try {
-        const lexer     = new Lexer(code);
-        const tokens    = lexer.tokenize();
-        const parser    = new Parser(tokens);
-        const ast       = parser.parse();
-        const evaluator = new Evaluator(fullPath);
-        await evaluator.execute(ast);
-    } catch (error) {
-        console.error('❌ Erro MambaScript:', error.message);
-        process.exit(1);
-    }
-})();
+        try {
+            const lexer     = new Lexer(code);
+            const tokens    = lexer.tokenize();
+            const parser    = new Parser(tokens);
+            const ast       = parser.parse();
+            const evaluator = new Evaluator(fullPath);
+            await evaluator.execute(ast);
+        } catch (error) {
+            console.error('❌ Erro MambaScript:', error.message);
+            process.exit(1);
+        }
+    })();
 }

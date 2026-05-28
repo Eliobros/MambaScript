@@ -3,10 +3,16 @@
 const fs = require('fs');
 const path = require('path');
 const https = require('https');
+const http = require('http');
+const tar = require('tar');
+const os = require('os');
 
-// Repositório central de pacotes no GitHub
-const REPO_BASE = 'https://raw.githubusercontent.com/Eliobros/mambascript-pacotes/master/pacotes';
-const REPO_API  = 'https://api.github.com/repos/Eliobros/mambascript-pacotes/contents/pacotes';
+
+
+// Registry oficial MambaScript
+//7const REGISTRY_URL = process.env.MAMBAS_REGISTRY || 'http://localhost:3004';
+
+const REGISTRY_URL = process.env.MAMBAS_REGISTRY || 'https://habibo-mambascript-registry.mozhost.shop';
 
 // Pasta de módulos do projeto atual
 const MODULOS_DIR = path.join(process.cwd(), 'modulos_mambas');
@@ -37,12 +43,17 @@ function salvarRegistro(registro) {
     fs.writeFileSync(REGISTRO_PATH, JSON.stringify(registro, null, 2));
 }
 
-function get(url) {
+function get(url, token = null) {
     return new Promise((resolve, reject) => {
-        const options = {
-            headers: { 'User-Agent': 'MambaScript-Instalador' }
-        };
-        https.get(url, options, (res) => {
+        const client = url.startsWith('https') ? https : http;
+        const headers = { 'User-Agent': 'MambaScript-Instalador' };
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+
+        const options = { headers };
+        client.get(url, options, (res) => {
+            if (res.statusCode === 301 || res.statusCode === 302) {
+                return get(res.headers.location, token).then(resolve).catch(reject);
+            }
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
@@ -52,6 +63,28 @@ function get(url) {
                     reject(new Error(`HTTP ${res.statusCode}`));
                 }
             });
+        }).on('error', reject);
+    });
+}
+
+function download(url, destino) {
+    return new Promise((resolve, reject) => {
+        const client = url.startsWith('https') ? https : http;
+        const options = {
+            headers: { 'User-Agent': 'MambaScript-Instalador' }
+        };
+        client.get(url, options, (res) => {
+            // Seguir redirects
+            if (res.statusCode === 301 || res.statusCode === 302) {
+                return download(res.headers.location, destino).then(resolve).catch(reject);
+            }
+            if (res.statusCode !== 200) {
+                return reject(new Error(`HTTP ${res.statusCode}`));
+            }
+            const file = fs.createWriteStream(destino);
+            res.pipe(file);
+            file.on('finish', () => file.close(resolve));
+            file.on('error', reject);
         }).on('error', reject);
     });
 }
@@ -69,41 +102,53 @@ async function instalar(nomePacote) {
     console.log(`📦 Instalando pacote: ${nomePacote}...`);
     garantirPasta();
 
-    // Busca metadados do pacote
-    let meta;
+    // Buscar metadados
+    let meta = { versao: '1.0.0', descricao: '' };
     try {
-        const metaRaw = await get(`${REPO_BASE}/${nomePacote}/pacote.json`);
-        meta = JSON.parse(metaRaw);
-    } catch {
-        console.error(`❌ Pacote "${nomePacote}" não encontrado no repositório.`);
-        console.error(`💡 Use "mambas procurar" para ver pacotes disponíveis.`);
+        const lista = JSON.parse(await get(`${REGISTRY_URL}/pacotes`));
+        const encontrado = lista.find(p => p.nome === nomePacote);
+        if (!encontrado) {
+            console.error(`❌ Pacote "${nomePacote}" não encontrado.`);
+            console.error(`💡 Use "mambas procurar" para ver pacotes disponíveis.`);
+            process.exit(1);
+        }
+        meta = encontrado;
+    } catch (e) {
+        console.error(`❌ Não foi possível conectar ao registry: ${e.message}`);
         process.exit(1);
     }
 
-    // Baixa o index.ms do pacote
-    let codigo;
+    // Baixar .tgz
+    const tmpPath = path.join(os.tmpdir(), `${nomePacote}.tgz`);
     try {
-        codigo = await get(`${REPO_BASE}/${nomePacote}/index.ms`);
-    } catch {
-        console.error(`❌ Erro ao baixar o código do pacote "${nomePacote}".`);
+        await download(`${REGISTRY_URL}/pacotes/${nomePacote}/download`, tmpPath);
+    } catch (e) {
+        console.error(`❌ Erro ao baixar: ${e.message}`);
         process.exit(1);
     }
 
-    // Salva na pasta modulos_mambas
-    const destino = path.join(MODULOS_DIR, `${nomePacote}.ms`);
-    fs.writeFileSync(destino, codigo);
+    // Extrair em modulos_mambas/<nome>/
+    const destino = path.join(MODULOS_DIR, nomePacote);
+    fs.mkdirSync(destino, { recursive: true });
 
-    // Atualiza registro
+    try {
+        await tar.extract({ file: tmpPath, cwd: destino });
+        fs.unlinkSync(tmpPath);
+    } catch (e) {
+        console.error(`❌ Erro ao extrair: ${e.message}`);
+        process.exit(1);
+    }
+
+    // Atualizar registro
     const registro = carregarRegistro();
     registro[nomePacote] = {
         versao: meta.versao || '1.0.0',
         descricao: meta.descricao || '',
-        autor: meta.autor || '',
         instaladoEm: new Date().toISOString()
     };
     salvarRegistro(registro);
 
-    console.log(`✅ Pacote "${nomePacote}" v${meta.versao} instalado com sucesso!`);
+    console.log(`✅ Pacote "${nomePacote}" v${meta.versao} instalado!`);
     console.log(`💡 Use: importar ${nomePacote} de "${nomePacote}"`);
 }
 
@@ -137,7 +182,7 @@ function listar() {
 
     if (pacotes.length === 0) {
         console.log('📭 Nenhum pacote instalado.');
-        console.log('💡 Use "mambas procurar" para ver pacotes disponíveis.');
+        console.log('💡 Use "mambas procurar" para ver pacotes disponíveis no registry.');
         return;
     }
 
@@ -148,39 +193,62 @@ function listar() {
     }
 }
 
-async function procurar() {
+async function procurar(termo) {
     console.log('🔍 Buscando pacotes disponíveis...\n');
 
-    let conteudo;
+    let pacotes;
     try {
-        const raw = await get(REPO_API);
-        conteudo = JSON.parse(raw);
-    } catch {
-        console.error('❌ Não foi possível conectar ao repositório de pacotes.');
+        pacotes = JSON.parse(await get(`${REGISTRY_URL}/pacotes`));
+    } catch (e) {
+        console.error(`❌ Não foi possível conectar ao registry: ${e.message}`);
         console.error('💡 Verifique sua conexão com a internet.');
         process.exit(1);
     }
 
-    if (!Array.isArray(conteudo) || conteudo.length === 0) {
+    if (!pacotes || pacotes.length === 0) {
         console.log('📭 Nenhum pacote disponível ainda.');
         return;
     }
 
-    const registro = carregarRegistro();
-    console.log(`📦 Pacotes disponíveis (${conteudo.length}):\n`);
+    // Filtrar por termo de busca se fornecido
+    const resultado = termo
+        ? pacotes.filter(p =>
+            p.nome.includes(termo) ||
+            (p.descricao && p.descricao.includes(termo))
+          )
+        : pacotes;
 
-    for (const item of conteudo) {
-        if (item.type === 'dir') {
-            const instalado = registro[item.name] ? ' ✅ instalado' : '';
-            // Tenta buscar metadados
-            try {
-                const metaRaw = await get(`${REPO_BASE}/${item.name}/pacote.json`);
-                const meta = JSON.parse(metaRaw);
-                console.log(`  • ${item.name} v${meta.versao} — ${meta.descricao}${instalado}`);
-            } catch {
-                console.log(`  • ${item.name}${instalado}`);
-            }
-        }
+    if (resultado.length === 0) {
+        console.log(`📭 Nenhum pacote encontrado para "${termo}".`);
+        return;
+    }
+
+    const registro = carregarRegistro();
+    console.log(`📦 Pacotes disponíveis (${resultado.length}):\n`);
+    for (const p of resultado) {
+        const instalado = registro[p.nome] ? ' ✅ instalado' : '';
+        console.log(`  • ${p.nome} v${p.versao} — ${p.descricao}${instalado}`);
+    }
+}
+
+async function whoami() {
+    const tokenPath = path.join(require('os').homedir(), '.mambas', 'token');
+    if (!fs.existsSync(tokenPath)) {
+        console.error('❌ Não autenticado.');
+        console.error('💡 Use: mambas login <token>');
+        process.exit(1);
+    }
+
+    const token = fs.readFileSync(tokenPath, 'utf-8').trim();
+
+    try {
+        const raw = await get(`${REGISTRY_URL}/me`, token);
+        const data = JSON.parse(raw);
+        console.log(`👤 Username : ${data.username}`);
+        console.log(`📧 Email    : ${data.email}`);
+        console.log(`📅 Membro desde: ${new Date(data.criadoEm).toLocaleDateString('pt-BR')}`);
+    } catch (e) {
+        console.error(`❌ Erro: ${e.message}`);
     }
 }
 
@@ -189,12 +257,15 @@ function ajuda() {
 🐍 MambaScript — Gestor de Pacotes
 
 Uso:
-  mambas <arquivo.ms>          Executa um arquivo MambaScript
-  mambas instalar <pacote>     Instala um pacote
-  mambas remover <pacote>      Remove um pacote instalado
-  mambas listar                Lista pacotes instalados
-  mambas procurar              Lista pacotes disponíveis no repositório
-  mambas ajuda                 Mostra esta mensagem
+  mambas <arquivo.ms>              Executa um arquivo MambaScript
+  mambas instalar <pacote>         Instala um pacote do registry
+  mambas remover <pacote>          Remove um pacote instalado
+  mambas listar                    Lista pacotes instalados localmente
+  mambas procurar [termo]          Busca pacotes no registry
+  mambas ajuda                     Mostra esta mensagem
+
+Registry atual: ${REGISTRY_URL}
+💡 Para usar outro registry: MAMBAS_REGISTRY=https://... mambas instalar <pacote>
     `);
 }
 
@@ -202,4 +273,4 @@ Uso:
 // Exporta os comandos
 // ─────────────────────────────────────────────
 
-module.exports = { instalar, remover, listar, procurar, ajuda };
+module.exports = { instalar, remover, listar, procurar, ajuda, whoami };
