@@ -165,10 +165,10 @@ async function remover(nomePacote) {
         process.exit(1);
     }
 
-    const ficheiro = path.join(MODULOS_DIR, `${nomePacote}.ms`);
-    if (fs.existsSync(ficheiro)) {
-        fs.unlinkSync(ficheiro);
-    }
+    const pasta = path.join(MODULOS_DIR, nomePacote);
+if (fs.existsSync(pasta)) {
+    fs.rmSync(pasta, { recursive: true, force: true });
+}
 
     delete registro[nomePacote];
     salvarRegistro(registro);
