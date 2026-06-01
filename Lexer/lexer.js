@@ -174,6 +174,17 @@ class Lexer {
                 }
                 continue;
             }
+            
+            if (this.currentChar === '!') {
+    this.advance();
+    if (this.currentChar === '=') {
+        this.advance();
+        tokens.push(new Token('NEQ', '!=', line, col));
+    } else {
+        throw new Error(`Caractere inválido '!' na linha ${line}, coluna ${col}`);
+    }
+    continue;
+}
 
             if (this.currentChar === '>') {
                 this.advance();

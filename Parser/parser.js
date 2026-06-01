@@ -333,7 +333,7 @@ class Parser {
 
         if (
             this.currentToken &&
-            ['GT', 'LT', 'EQ', 'GTE', 'LTE', 'KW_GT', 'KW_LT', 'KW_EQ', 'KW_GTE', 'KW_LTE'].includes(this.currentToken.type)
+            ['GT', 'LT', 'EQ', 'NEQ', 'GTE', 'LTE', 'KW_GT', 'KW_LT', 'KW_EQ', 'KW_GTE', 'KW_LTE'].includes(this.currentToken.type)
         ) {
             let operator = this.currentToken.type;
             const kwMap = { 'KW_GT': 'GT', 'KW_LT': 'LT', 'KW_EQ': 'EQ', 'KW_GTE': 'GTE', 'KW_LTE': 'LTE' };

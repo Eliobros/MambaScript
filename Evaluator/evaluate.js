@@ -247,16 +247,17 @@ class Evaluator {
                 }
 
             case 'Comparison':
-                const leftComp = await this.evaluate(node.left);
-                const rightComp = await this.evaluate(node.right);
-                switch (node.operator) {
-                    case 'GT': case 'GREATER': return leftComp > rightComp;
-                    case 'LT': case 'LESS': return leftComp < rightComp;
-                    case 'EQ': case 'EQUALS_COMP': return leftComp === rightComp;
-                    case 'GTE': case 'GREATER_EQUAL': return leftComp >= rightComp;
-                    case 'LTE': case 'LESS_EQUAL': return leftComp <= rightComp;
-                    default: throw new Error(`Comparação desconhecida: ${node.operator}`);
-                }
+    const leftComp = await this.evaluate(node.left);
+    const rightComp = await this.evaluate(node.right);
+    switch (node.operator) {
+        case 'GT': case 'GREATER': return leftComp > rightComp;
+        case 'LT': case 'LESS': return leftComp < rightComp;
+        case 'EQ': case 'EQUALS_COMP': return leftComp === rightComp;
+        case 'NEQ': return leftComp !== rightComp;
+        case 'GTE': case 'GREATER_EQUAL': return leftComp >= rightComp;
+        case 'LTE': case 'LESS_EQUAL': return leftComp <= rightComp;
+        default: throw new Error(`Comparação desconhecida: ${node.operator}`);
+    }
                 
               
 
