@@ -504,9 +504,10 @@ class Evaluator {
         let conexao = null;
 
         return {
-            conectar: async (host, usuario, senha, base) => {
+            conectar: async (host, usuario, senha, base, porta = 3306) => {
                 try {
-                    conexao = await mysql2.createConnection({ host, user: usuario, password: senha, database: base });
+                    conexao = await mysql2.createConnection({ host, user: usuario, password: senha, database: base,
+                    port: porta});
                     return { ok: true, mensagem: "Conexão estabelecida!" };
                 } catch (e) {
                     throw new Error(`❌ Erro ao conectar ao MySQL: ${e.message}`);
