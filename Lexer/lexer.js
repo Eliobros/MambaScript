@@ -129,7 +129,12 @@ class Lexer {
             'vezes': 'KW_MULT',
             'dividido': 'KW_DIV',
             'tente': 'TENTE', 
-            'capturar': 'CAPTURAR' 
+            'capturar': 'CAPTURAR',
+             'parar': 'BREAK',
+             'continuar': 'CONTINUE',
+              'escolher': 'SWITCH',
+              'caso': 'CASE',
+              'padrao': 'DEFAULT'
         };
 
         const type = keywords[id] || 'IDENTIFIER';

@@ -86,6 +86,12 @@ class Parser {
             return this.returnStatement();
         case 'IMPORT':
             return this.importStatement();
+        case 'BREAK':
+            return this.breakStatement();
+        case 'CONTINUE':
+            return this.continueStatement();
+        case 'SWITCH':
+            return this.switchStatement();
         case 'TENTE':
             return this.tryCatchStatement();
         case 'IDENTIFIER':
@@ -150,6 +156,65 @@ class Parser {
         const value = this.expression();
         return { type: 'VarDeclaration', name, value };
     }
+    
+    breakStatement() {
+    this.advance(); // pular 'parar'
+    return { type: 'Break' };
+}
+
+continueStatement() {
+    this.advance(); // pular 'continuar'
+    return { type: 'Continue' };
+}
+
+switchStatement() {
+    this.advance(); // pular 'escolher'
+    const value = this.expression();
+    this.expect('COLON');
+
+    const cases = [];
+    let defaultBody = null;
+
+    while (
+        this.currentToken &&
+        this.currentToken.type !== 'END' &&
+        this.currentToken.type !== 'EOF'
+    ) {
+        if (this.currentToken.type === 'CASE') {
+            this.advance(); // pular 'caso'
+            const caseValue = this.expression();
+            this.expect('COLON');
+
+            const body = [];
+            while (
+                this.currentToken &&
+                !['CASE', 'DEFAULT', 'END', 'EOF'].includes(this.currentToken.type)
+            ) {
+                body.push(this.statement());
+            }
+
+            cases.push({ value: caseValue, body });
+
+        } else if (this.currentToken.type === 'DEFAULT') {
+            this.advance(); // pular 'padrao'
+            this.expect('COLON');
+
+            defaultBody = [];
+            while (
+                this.currentToken &&
+                !['CASE', 'END', 'EOF'].includes(this.currentToken.type)
+            ) {
+                defaultBody.push(this.statement());
+            }
+        } else {
+            break;
+        }
+    }
+
+    this.expect('END');
+
+    return { type: 'Switch', value, cases, defaultBody };
+}
 
     ifStatement() {
         this.advance();

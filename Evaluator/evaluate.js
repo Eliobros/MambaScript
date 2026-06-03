@@ -3,6 +3,8 @@ class Evaluator {
         this.filePath = filePath || process.cwd();
         this.variables = {};
         this.functions = {};
+        this.hasBreaked = false;
+        this.hasContinued = false;
         this.returnValue = null;
         this.builtinFunctions = {
             'hoje': this.createDateObject.bind(this),
@@ -88,6 +90,40 @@ class Evaluator {
                     this.variables[node.name.name] = await this.evaluate(node.value);
                 }
                 break;
+                
+                case 'Break':
+    this.hasBreaked = true;
+    return;
+
+case 'Continue':
+    this.hasContinued = true;
+    return;
+
+case 'Switch':
+    const switchValue = await this.evaluate(node.value);
+    let matched = false;
+
+    for (const caso of node.cases) {
+        const caseValue = await this.evaluate(caso.value);
+        if (switchValue === caseValue) matched = true;
+
+        if (matched) {
+            for (const stmt of caso.body) {
+                await this.executeStatement(stmt);
+                if (this.hasBreaked) { this.hasBreaked = false; return; }
+                if (this.hasReturned) return;
+            }
+        }
+    }
+
+    if (!matched && node.defaultBody) {
+        for (const stmt of node.defaultBody) {
+            await this.executeStatement(stmt);
+            if (this.hasBreaked) { this.hasBreaked = false; return; }
+            if (this.hasReturned) return;
+        }
+    }
+    break;
 
             case 'If':
                 if (await this.evaluate(node.condition)) {
@@ -104,13 +140,17 @@ class Evaluator {
                 break;
 
             case 'While':
-                while (await this.evaluate(node.condition)) {
-                    for (const stmt of node.body) {
-                        await this.executeStatement(stmt);
-                        if (this.hasReturned) return;
-                    }
-                }
-                break;
+    while (await this.evaluate(node.condition)) {
+        for (const stmt of node.body) {
+            await this.executeStatement(stmt);
+            if (this.hasContinued) break; // sai do for interno, relança o while
+            if (this.hasBreaked || this.hasReturned) break;
+        }
+        if (this.hasContinued) { this.hasContinued = false; continue; }
+        if (this.hasBreaked) { this.hasBreaked = false; break; }
+        if (this.hasReturned) return;
+    }
+    break;
 
             case 'FunctionDeclaration':
                 this.functions[node.name] = {
@@ -125,17 +165,20 @@ class Evaluator {
                 break;
 
             case 'For':
-                const startVal = await this.evaluate(node.start);
-                const endVal = await this.evaluate(node.end);
-                for (let i = startVal; i <= endVal; i++) {
-                    this.variables[node.varName] = i;
-                    for (const stmt of node.body) {
-                        await this.executeStatement(stmt);
-                        if (this.hasReturned) return;
-                    }
-                }
-                break;
-
+    const startVal = await this.evaluate(node.start);
+    const endVal = await this.evaluate(node.end);
+    for (let i = startVal; i <= endVal; i++) {
+        this.variables[node.varName] = i;
+        for (const stmt of node.body) {
+            await this.executeStatement(stmt);
+            if (this.hasContinued) break;
+            if (this.hasBreaked || this.hasReturned) break;
+        }
+        if (this.hasContinued) { this.hasContinued = false; continue; }
+        if (this.hasBreaked) { this.hasBreaked = false; break; }
+        if (this.hasReturned) return;
+    }
+    break;
             case 'Import':
                 await this.executeImport(node);
                 break;
