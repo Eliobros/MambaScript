@@ -8,7 +8,7 @@
   },
   "scripts": {
     "test": "node mambas exemplos/ola.ms",
-    "build": "pkg mambas -o dist/mambascript-mz --out-path dist"
+    "build": "pkg mambas --out-path dist --targets node18-linux-x64,node18-macos-x64,node18-win-x64"
   },
   "keywords": [
     "mambascript",
@@ -48,7 +48,9 @@
     "scripts": [
       "Lexer/lexer.js",
       "Parser/parser.js",
-      "Evaluator/evaluate.js"
+      "Evaluator/evaluate.js",
+      "Instalador/instalador.js",
+      "Instalador/publicador.js"
     ],
     "assets": [
       "node_modules/prompt-sync/**/*"

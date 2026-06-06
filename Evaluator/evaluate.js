@@ -71,25 +71,35 @@ class Evaluator {
                 this.variables[node.name] = varValue;
                 break;
 
-            case 'Assignment':
-                if (typeof node.name === 'string') {
-                    if (!(node.name in this.variables)) {
-                        throw new Error(`Variável não definida: ${node.name}`);
-                    }
-                    this.variables[node.name] = await this.evaluate(node.value);
-                } else if (node.name.type === 'PropertyAccess') {
-                    const obj = await this.evaluate(node.name.object);
-                    if (typeof obj !== 'object' || obj === null) {
-                        throw new Error('Tentativa de atribuir propriedade em não-objeto');
-                    }
-                    obj[node.name.property] = await this.evaluate(node.value);
-                } else if (node.name.type === 'Identifier') {
-                    if (!(node.name.name in this.variables)) {
-                        throw new Error(`Variável não definida: ${node.name.name}`);
-                    }
-                    this.variables[node.name.name] = await this.evaluate(node.value);
-                }
-                break;
+            case 'Assignment': {
+    const valor = await this.evaluate(node.value);
+
+    if (node.name.type === 'IndexAccess') {
+        const obj = await this.evaluate(node.name.object);
+        const chave = await this.evaluate(node.name.index);
+        obj[chave] = valor;
+        return;
+    }
+
+    if (node.name.type === 'PropertyAccess') {
+        const obj = await this.evaluate(node.name.object);
+        obj[node.name.property] = valor;
+        return;
+    }
+
+    if (node.name.type === 'Identifier') {
+        this.variables[node.name.name] = valor;
+        return;
+    }
+
+    if (typeof node.name === 'string') {
+        this.variables[node.name] = valor;
+        return;
+    }
+
+    throw new Error(`Assignment inválido`);
+}
+break
                 
                 case 'Break':
     this.hasBreaked = true;
@@ -250,26 +260,43 @@ case 'Switch':
                     body: node.body
                 };
 
-            case 'ArrayAccess':
-                const array = await this.evaluate(node.array);
-                const index = await this.evaluate(node.index);
-                if (!Array.isArray(array)) throw new Error('Tentativa de acessar índice em não-array');
-                if (typeof index !== 'number') throw new Error('Índice deve ser um número');
-                if (index < 0 || index >= array.length) throw new Error(`Índice ${index} fora dos limites (tamanho: ${array.length})`);
-                return array[index];
+            case 'ArrayAccess': {
+    const array = await this.evaluate(node.array);
+    const index = await this.evaluate(node.index);
 
-            case 'PropertyAccess':
-                const object = await this.evaluate(node.object);
-                if (object === null || object === undefined) {
-                    throw new Error(`Tentativa de acessar propriedade "${node.property}" em valor nulo`);
-                }
-                if (typeof object === 'object' && !Array.isArray(object) && !object._type) {
-                    if (!(node.property in object)) {
-                        throw new Error(`Propriedade "${node.property}" não existe no objeto`);
-                    }
-                    return object[node.property];
-                }
-                throw new Error(`O tipo ${typeof object} não possui propriedades acessíveis`);
+    if (Array.isArray(array)) {
+        if (typeof index !== 'number') throw new Error('Índice deve ser um número');
+        if (index < 0 || index >= array.length) throw new Error(`Índice ${index} fora dos limites`);
+        return array[index];
+    }
+
+    if (typeof array === 'object' && array !== null) {
+        return array[index];
+    }
+
+    throw new Error('Tentativa de acessar índice em não-array ou objeto');
+}
+
+            case 'PropertyAccess': {
+    const object = await this.evaluate(node.object);
+
+    if (object === null || object === undefined) {
+        throw new Error(`Tentativa de acessar propriedade "${node.property}" em valor nulo`);
+    }
+
+    // Atalho para .tamanho em arrays e strings
+    if (node.property === 'tamanho') {
+        if (Array.isArray(object) || typeof object === 'string') {
+            return object.length;
+        }
+    }
+
+    if (typeof object === 'object' || typeof object === 'function') {
+        return object[node.property];
+    }
+
+    return object[node.property];
+}
 
             case 'BinaryOp':
                 const left = await this.evaluate(node.left);
@@ -353,15 +380,57 @@ case 'Switch':
     async callMethod(obj, methodName, args) {
         // STRING METHODS
         if (typeof obj === 'string') {
-            if (methodName === 'paraNumero') {
-                const n = Number(obj);
-                if (isNaN(n)) throw new Error(`❌ Erro MambaScript: "${obj}" não é um número válido.`);
-                return n;
-            }
-            if (methodName === 'tamanho') return obj.length;
-            if (methodName === 'maiuscula') return obj.toUpperCase();
-            if (methodName === 'minuscula') return obj.toLowerCase();
-        }
+    if (methodName === 'paraNumero') {
+        const n = Number(obj);
+        if (isNaN(n)) throw new Error(`❌ "${obj}" não é um número válido.`);
+        return n;
+    }
+    if (methodName === 'tamanho') return obj.length;
+    if (methodName === 'maiuscula') return obj.toUpperCase();
+    if (methodName === 'minuscula') return obj.toLowerCase();
+    
+    // NOVOS
+    if (methodName === 'dividir') {
+    const sep = args[0] ? await this.evaluate(args[0]) : '';
+    
+    const unescape = (s) => s
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\t/g, '\t');
+    
+    return obj.split(unescape(sep));
+}
+    if (methodName === 'aparar') return obj.trim();
+    if (methodName === 'incluir') {
+        const sub = await this.evaluate(args[0]);
+        return obj.includes(sub);
+    }
+    if (methodName === 'começa_com') {
+        const sub = await this.evaluate(args[0]);
+        return obj.startsWith(sub);
+    }
+    if (methodName === 'termina_com') {
+        const sub = await this.evaluate(args[0]);
+        return obj.endsWith(sub);
+    }
+    if (methodName === 'substituir') {
+    const de = await this.evaluate(args[0]);
+    const para = await this.evaluate(args[1]);
+    
+    // Interpreta escape sequences
+    const unescape = (s) => s
+        .replace(/\\n/g, '\n')
+        .replace(/\\r/g, '\r')
+        .replace(/\\t/g, '\t');
+    
+    return obj.replace(unescape(de), unescape(para));
+}
+    if (methodName === 'fatiar') {
+        const inicio = await this.evaluate(args[0]);
+        const fim = args[1] ? await this.evaluate(args[1]) : undefined;
+        return obj.slice(inicio, fim);
+    }
+}
 
         // NUMBER METHODS
         if (typeof obj === 'number') {

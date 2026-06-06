@@ -94,47 +94,62 @@ class Parser {
             return this.switchStatement();
         case 'TENTE':
             return this.tryCatchStatement();
-        case 'IDENTIFIER':
-            // ✅ ATUALIZADO - Detecta assignment vs method call
+
+        case 'IDENTIFIER': {
             const savedPos = this.pos;
             const savedToken = this.currentToken;
 
-            const name = this.expect('IDENTIFIER').value;
+            this.expect('IDENTIFIER');
 
-            // Se o próximo token é ASSIGN, é uma atribuição
+            // resultado = valor
             if (this.currentToken && this.currentToken.type === 'ASSIGN') {
                 this.pos = savedPos;
                 this.currentToken = savedToken;
                 return this.assignmentStatement();
             }
 
-            // Se o próximo token é DOT, verificar se é atribuição ou method call
+            // obj.prop = valor
             if (this.currentToken && this.currentToken.type === 'DOT') {
-                const dotPos = this.pos;
-                this.advance(); // Pular o DOT
-                
-                const propertyOrMethod = this.expect('IDENTIFIER').value;
-                
-                // Se depois do identificador tem ASSIGN, é atribuição
+                this.advance();
+                this.expect('IDENTIFIER');
+
                 if (this.currentToken && this.currentToken.type === 'ASSIGN') {
                     this.pos = savedPos;
                     this.currentToken = savedToken;
                     return this.assignmentStatement();
                 }
-                
-                // Se tem LPAREN ou qualquer outra coisa, processar como expressão
+
                 this.pos = savedPos;
                 this.currentToken = savedToken;
-                const expr = this.expression();
-                return { type: 'ExpressionStatement', expression: expr };
+                const exprDot = this.expression();
+                return { type: 'ExpressionStatement', expression: exprDot };
             }
 
-            // Senão, é uma chamada de função ou expressão standalone
+            // resultado[chave] = valor
+            if (this.currentToken && this.currentToken.type === 'LBRACKET') {
+                this.advance();
+                this.expression(); // consome o índice
+                this.expect('RBRACKET');
+
+                if (this.currentToken && this.currentToken.type === 'ASSIGN') {
+                    this.pos = savedPos;
+                    this.currentToken = savedToken;
+                    return this.assignmentStatement();
+                }
+
+                this.pos = savedPos;
+                this.currentToken = savedToken;
+                const exprIdx = this.expression();
+                return { type: 'ExpressionStatement', expression: exprIdx };
+            }
+
+            // Chamada de função ou expressão standalone
             this.pos = savedPos;
             this.currentToken = savedToken;
-            const expr = this.expression();
-            return { type: 'ExpressionStatement', expression: expr };
-            
+            const exprStmt = this.expression();
+            return { type: 'ExpressionStatement', expression: exprStmt };
+        }
+
         default:
             throw new Error(
                 `❌ Erro na linha ${this.currentToken.line}: ` +
@@ -142,6 +157,8 @@ class Parser {
             );
     }
 }
+
+
 
     printStatement() {
         this.advance();
@@ -353,10 +370,15 @@ switchStatement() {
 }
 
     assignmentStatement() {
-        const name = this.expect('IDENTIFIER').value;
-        let target = { type: 'Identifier', name };
+    const name = this.expect('IDENTIFIER').value;
+    let target = { type: 'Identifier', name };
 
-        while (this.currentToken && this.currentToken.type === 'DOT') {
+    // Suporta encadeamento de DOT e LBRACKET
+    while (this.currentToken && (
+        this.currentToken.type === 'DOT' ||
+        this.currentToken.type === 'LBRACKET'
+    )) {
+        if (this.currentToken.type === 'DOT') {
             this.advance();
             const property = this.expect('IDENTIFIER').value;
             target = {
@@ -364,12 +386,22 @@ switchStatement() {
                 object: target,
                 property
             };
+        } else if (this.currentToken.type === 'LBRACKET') {
+            this.advance();
+            const index = this.expression();
+            this.expect('RBRACKET');
+            target = {
+                type: 'IndexAccess',
+                object: target,
+                index
+            };
         }
-
-        this.expect('ASSIGN');
-        const value = this.expression();
-        return { type: 'Assignment', name: target, value };
     }
+
+    this.expect('ASSIGN');
+    const value = this.expression();
+    return { type: 'Assignment', name: target, value };
+}
 
     comparison() {
         let left = this.comparisonUnit();
