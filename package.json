@@ -1,6 +1,6 @@
 {
   "name": "mambascript-mz",
-  "version": "2.12.0",
+  "version": "2.12.1",
   "description": "🐍 Linguagem de programação moçambicana - Rápida, poderosa e em português!",
   "main": "index.js",
   "bin": {
