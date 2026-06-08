@@ -310,6 +310,17 @@ para i de 1 ate 10:
 fim
 ```
 
+### Ciclo Para Cada
+
+```ms
+variavel frutas = ["manga", "papaia", "banana", "coco"]
+
+para cada fruta em frutas:
+    escreva fruta
+fim
+Use para i de X ate Y quando precisas do índice numérico, e para cada quando só precisas dos valores diretamente.
+
+
 ### Controle de Ciclos (parar / continuar)
 
 Use `parar` para sair de um ciclo e `continuar` para pular para a próxima iteração:
