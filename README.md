@@ -167,10 +167,21 @@ escreva 15 dividido 3
 | Operação | Símbolo | Palavra-chave |
 |----------|---------|---------------|
 | Igual | `==` | `igual` |
+| Diferente | `!=` | — |
 | Maior que | `>` | `maior` |
 | Menor que | `<` | `menor` |
 | Maior ou igual | `>=` | `maiorIgual` |
 | Menor ou igual | `<=` | `menorIgual` |
+
+```ms
+variavel a = 10
+variavel b = 20
+
+escreva a == b
+escreva a != b
+escreva a > b
+escreva a <= b
+```
 
 ### Operadores Lógicos
 
@@ -225,7 +236,9 @@ senao:
 fim
 ```
 
-Condicionais aninhadas:
+### Condicionais Aninhadas (senao + se)
+
+Para encadear múltiplas condições, use `senao` com um `se` dentro:
 
 ```ms
 variavel nota = 85
@@ -236,10 +249,38 @@ senao:
     se nota >= 70:
         escreva "Bom trabalho!"
     senao:
-        escreva "Precisa melhorar."
+        se nota >= 50:
+            escreva "Suficiente."
+        senao:
+            escreva "Precisa melhorar."
+        fim
     fim
 fim
 ```
+
+### Escolha (escolha / caso / padrao)
+
+Use `escolha` para comparar um valor com múltiplos casos:
+
+```ms
+variavel dia = 2
+
+escolha dia:
+    caso 1:
+        escreva "Segunda-feira"
+        parar
+    caso 2:
+        escreva "Terça-feira"
+        parar
+    caso 3:
+        escreva "Quarta-feira"
+        parar
+    padrao:
+        escreva "Outro dia"
+fim
+```
+
+> ⚠️ Use `parar` ao final de cada caso para evitar que a execução continue nos próximos casos.
 
 ### Ciclo Enquanto
 
@@ -267,6 +308,30 @@ Exemplo com cálculo:
 para i de 1 ate 10:
     escreva "7 x " + i + " = " + (7 * i)
 fim
+```
+
+### Controle de Ciclos (parar / continuar)
+
+Use `parar` para sair de um ciclo e `continuar` para pular para a próxima iteração:
+
+```ms
+# parar — sai do ciclo quando i == 3
+para i de 1 ate 10:
+    se i == 3:
+        parar
+    fim
+    escreva i
+fim
+# Saída: 1, 2
+
+# continuar — pula i == 3
+para i de 1 ate 5:
+    se i == 3:
+        continuar
+    fim
+    escreva i
+fim
+# Saída: 1, 2, 4, 5
 ```
 
 ---
@@ -346,16 +411,28 @@ fim
 | `.maiuscula()` | Converte para maiúsculas | `"olá".maiuscula()` → `"OLÁ"` |
 | `.minuscula()` | Converte para minúsculas | `"OLÁ".minuscula()` → `"olá"` |
 | `.paraNumero()` | Converte string para número | `"42".paraNumero()` → `42` |
+| `.dividir(sep)` | Divide em array pelo separador | `"a,b".dividir(",")` → `["a","b"]` |
+| `.aparar()` | Remove espaços nas extremidades | `" olá ".aparar()` → `"olá"` |
+| `.incluir(sub)` | Verifica se contém a substring | `"mamba".incluir("mb")` → `verdadeiro` |
+| `.começa_com(sub)` | Verifica o início | `"mamba".começa_com("ma")` → `verdadeiro` |
+| `.termina_com(sub)` | Verifica o fim | `"mamba".termina_com("ba")` → `verdadeiro` |
+| `.substituir(de, para)` | Substitui parte da string | `"ola".substituir("o","O")` → `"Ola"` |
+| `.fatiar(inicio, fim?)` | Extrai parte da string | `"mamba".fatiar(0, 3)` → `"mam"` |
 
 ```ms
-variavel texto = "mambascript"
+variavel texto = "  mambascript  "
 
-escreva texto.tamanho()
-escreva texto.maiuscula()
-escreva texto.minuscula()
+escreva texto.aparar()
+escreva texto.aparar().maiuscula()
+escreva texto.aparar().tamanho()
+escreva texto.aparar().incluir("script")
+escreva texto.aparar().começa_com("mamba")
+escreva texto.aparar().substituir("mamba", "MAMBA")
+escreva texto.aparar().fatiar(0, 5)
 
-variavel numero = "123".paraNumero()
-escreva numero + 7
+variavel partes = "Maputo,Beira,Nampula".dividir(",")
+escreva partes[0]
+escreva partes[1]
 ```
 
 ---
@@ -460,6 +537,24 @@ escreva turma.alunos[0]
 
 ## 📦 Sistema de Importação
 
+### Importar Módulo Completo
+
+```ms
+importar matematica de "matematica"
+escreva matematica.PI
+```
+
+### Importar Nomes Específicos
+
+Podes importar apenas o que precisas de um módulo:
+
+```ms
+importar { raiz, potencia } de "matematica"
+
+escreva raiz(144)
+escreva potencia(2, 8)
+```
+
 ### Importar Módulos Locais
 
 Crie um arquivo em `modulos_mambas/`:
@@ -476,9 +571,13 @@ Importe no programa principal:
 ```ms
 importar utils de "utils"
 escreva utils.dobro(10)
+
+# Ou com importação nomeada:
+importar { dobro } de "utils"
+escreva dobro(10)
 ```
 
-### Importar Módulos Built-in
+### Módulos Built-in Disponíveis
 
 ```ms
 importar matematica de "matematica"
@@ -486,6 +585,7 @@ importar fs de "fs"
 importar caminho de "caminho"
 importar http de "http"
 importar bd de "mysql"
+importar sistema de "sistema"
 ```
 
 ---
@@ -504,6 +604,7 @@ importar bd de "mysql"
 | `teto(n)` | Arredondamento para cima |
 | `chao(n)` | Arredondamento para baixo |
 | `aleatorio()` | Número aleatório entre 0 e 1 |
+| `aleatorio(min, max)` | Número inteiro aleatório entre min e max |
 | `seno(n)` | Seno |
 | `cosseno(n)` | Cosseno |
 
@@ -515,6 +616,7 @@ escreva matematica.raiz(144)
 escreva matematica.potencia(2, 10)
 escreva matematica.arredondar(3.7)
 escreva matematica.aleatorio()
+escreva matematica.aleatorio(1, 100)
 ```
 
 ### 📁 Módulo `fs`
@@ -554,9 +656,35 @@ escreva caminho.extensao("programa.ms")
 escreva caminho.absoluto("programa.ms")
 ```
 
-### 🌐 Módulo `http` — Cliente
+### 🖥️ Módulo `sistema`
 
-O módulo `http` permite fazer requisições HTTP a APIs externas:
+Permite interagir com o sistema operativo e o ambiente de execução:
+
+| Função | Descrição |
+|--------|-----------|
+| `plataforma()` | Retorna o sistema operativo (`linux`, `win32`, etc.) |
+| `variavel(nome)` | Lê uma variável de ambiente |
+| `executar(cmd)` | Executa um comando do sistema e retorna a saída |
+| `sair(codigo?)` | Encerra o programa com um código de saída |
+| `args()` | Retorna os argumentos passados na linha de comando |
+| `pid()` | Retorna o ID do processo actual |
+| `memoria()` | Retorna informação sobre o uso de memória |
+
+```ms
+importar sistema de "sistema"
+
+escreva sistema.plataforma()
+escreva sistema.pid()
+escreva sistema.variavel("HOME")
+escreva sistema.executar("echo Olá do sistema!")
+
+variavel argumentos = sistema.args()
+escreva argumentos
+
+sistema.sair(0)
+```
+
+### 🌐 Módulo `http` — Cliente
 
 | Função | Descrição |
 |--------|-----------|
@@ -585,7 +713,6 @@ senao:
     escreva "Erro: " + resposta.status
 fim
 
-# POST com corpo JSON
 variavel resultado = http.post("https://api.exemplo.com/usuarios", {
     "nome": "Habibo",
     "email": "habibo@exemplo.com"
@@ -596,10 +723,6 @@ escreva resultado.status
 ---
 
 ## 🖥️ Servidor HTTP
-
-O módulo `http` também permite criar servidores HTTP nativamente em MambaScript.
-
-### Criar um Servidor
 
 ```ms
 importar http de "http"
@@ -680,11 +803,7 @@ escreva "API rodando na porta 3000!"
 
 ## 🗄️ Base de Dados MySQL
 
-MambaScript tem suporte nativo a MySQL através do módulo `mysql`.
-
 ### Pré-requisito
-
-O `mysql2` deve estar instalado no runtime do MambaScript:
 
 ```bash
 npm install mysql2
@@ -694,7 +813,7 @@ npm install mysql2
 
 | Função | Descrição |
 |--------|-----------|
-| `conectar(host, usuario, senha, base)` | Conecta ao banco de dados |
+| `conectar(host, usuario, senha, base, porta?)` | Conecta ao banco de dados (porta padrão: 3306) |
 | `consultar(sql, parametros?)` | Executa SELECT, retorna array |
 | `executar(sql, parametros?)` | Executa INSERT/UPDATE/DELETE |
 | `fechar()` | Fecha a conexão |
@@ -707,58 +826,84 @@ O método `executar` retorna:
 | `inseridoId` | ID do último registo inserido |
 | `ok` | `verdadeiro` se afetou alguma linha |
 
-### Exemplo de Uso
-
 ```ms
 importar bd de "mysql"
 
 bd.conectar("localhost", "root", "senha", "minha_base")
 
-# SELECT
 variavel usuarios = bd.consultar("SELECT * FROM usuarios")
 escreva usuarios
 
-# SELECT com parâmetros
 variavel user = bd.consultar("SELECT * FROM usuarios WHERE id = ?", [1])
 escreva user
 
-# INSERT
 variavel resultado = bd.executar(
     "INSERT INTO usuarios (nome, email) VALUES (?, ?)",
     ["Habibo", "habibo@exemplo.com"]
 )
 escreva "ID inserido: " + resultado.inseridoId
 
-# UPDATE
 bd.executar("UPDATE usuarios SET nome = ? WHERE id = ?", ["Elio", 1])
-
-# DELETE
 bd.executar("DELETE FROM usuarios WHERE id = ?", [1])
 
 bd.fechar()
 ```
 
-### API com MySQL
+---
+
+## ⚡ Funções Built-in
+
+### 📅 `hoje()`
+
+Retorna um objecto com a data e hora actuais:
+
+| Método | Descrição |
+|--------|-----------|
+| `mostrarData()` | Data formatada |
+| `mostrarHora()` | Hora formatada |
+| `ano()` | Ano actual |
+| `dia()` | Dia do mês |
+| `horas()` | Horas |
+| `minutos()` | Minutos |
+| `segundos()` | Segundos |
+| `mes()` | Objecto com `numero` e `nome` |
+| `semana()` | Objecto com `numero` e `nome` |
+| `timestamp()` | Timestamp Unix |
+| `formatado()` | Data no formato `DD/MM/AAAA` |
+| `horaFormatada()` | Hora no formato `HH:MM:SS` |
 
 ```ms
-importar http de "http"
-importar bd de "mysql"
+variavel data = hoje()
+escreva data.mostrarData()
+escreva data.mostrarHora()
+escreva data.ano()
+escreva data.mes().nome
+escreva data.semana().nome
+escreva data.formatado()
+escreva data.timestamp()
 
-bd.conectar("localhost", "root", "senha", "app_db")
+# Com fuso horário
+variavel dataMZ = hoje("Africa/Maputo")
+escreva dataMZ.horaFormatada()
+```
 
-variavel handler = funcao(requisicao, resposta):
-    se requisicao.url == "/api/usuarios":
-        variavel usuarios = bd.consultar("SELECT * FROM usuarios")
-        resposta.json(200, {"usuarios": usuarios})
-    senao:
-        resposta.json(404, {"erro": "Rota não encontrada"})
-    fim
-fim
+### 📄 Funções JSON
 
-variavel servidor = http.criarServidor()
-servidor.aoReceber(handler)
-servidor.escutar(3000)
-escreva "API com MySQL rodando na porta 3000!"
+| Função | Descrição |
+|--------|-----------|
+| `json_ler(arquivo)` | Lê e analisa um arquivo JSON |
+| `json_texto(string)` | Analisa uma string JSON |
+| `json_escrever(arquivo, dados)` | Escreve dados num arquivo JSON |
+
+```ms
+variavel config = json_ler("config.json")
+escreva config.nome
+
+variavel dados = json_texto('{"nome": "Mamba", "versao": 2}')
+escreva dados.nome
+
+variavel info = {nome: "MambaScript", versao: 2}
+json_escrever("saida.json", info)
 ```
 
 ---
@@ -798,8 +943,6 @@ fim
 
 ### Usar Localmente
 
-Coloque a pasta dentro de `modulos_mambas/` do seu projeto:
-
 ```
 meu-projeto/
 ├── main.ms
@@ -819,16 +962,9 @@ escreva meuPacote.despedida("Mundo")
 ### Gestor de Pacotes
 
 ```bash
-# Instalar um pacote
 mambas instalar nome-do-pacote
-
-# Remover um pacote
 mambas remover nome-do-pacote
-
-# Listar pacotes instalados
 mambas listar
-
-# Procurar pacotes
 mambas procurar
 ```
 
@@ -840,64 +976,6 @@ mambas procurar
 4. Use o título: `[Pacote] nome-do-pacote`
 5. Cole o código do `index.ms` e `pacote.json`
 6. Aguarda aprovação!
-
----
-
-## ⚡ Funções Built-in
-
-### 📅 `hoje()`
-
-Retorna um objecto com a data e hora actuais:
-
-| Método | Descrição |
-|--------|-----------|
-| `mostrarData()` | Data formatada |
-| `mostrarHora()` | Hora formatada |
-| `ano()` | Ano actual |
-| `dia()` | Dia do mês |
-| `horas()` | Horas |
-| `minutos()` | Minutos |
-| `segundos()` | Segundos |
-| `mes()` | Objecto com `numero` e `nome` |
-| `semana()` | Objecto com `numero` e `nome` |
-| `timestamp()` | Timestamp Unix |
-| `formatado()` | Data no formato `DD/MM/AAAA` |
-| `horaFormatada()` | Hora no formato `HH:MM:SS` |
-
-```ms
-variavel data = hoje()
-escreva data.mostrarData()
-escreva data.mostrarHora()
-escreva data.ano()
-escreva data.mes().nome
-escreva data.formatado()
-
-# Com fuso horário
-variavel dataMZ = hoje("Africa/Maputo")
-escreva dataMZ.horaFormatada()
-```
-
-### 📄 Funções JSON
-
-| Função | Descrição |
-|--------|-----------|
-| `json_ler(arquivo)` | Lê e analisa um arquivo JSON |
-| `json_texto(string)` | Analisa uma string JSON |
-| `json_escrever(arquivo, dados)` | Escreve dados num arquivo JSON |
-
-```ms
-# Ler arquivo JSON
-variavel config = json_ler("config.json")
-escreva config.nome
-
-# Analisar string JSON
-variavel dados = json_texto('{"nome": "Mamba", "versao": 2}')
-escreva dados.nome
-
-# Escrever arquivo JSON
-variavel info = {nome: "MambaScript", versao: 2}
-json_escrever("saida.json", info)
-```
 
 ---
 
@@ -958,7 +1036,25 @@ adicionarAluno("Maria", 15)
 mostrarResultados()
 ```
 
-### Exemplo 3: API REST Completa
+### Exemplo 3: Usando o Módulo Sistema
+
+```ms
+importar sistema de "sistema"
+
+escreva "Plataforma: " + sistema.plataforma()
+escreva "PID: " + sistema.pid()
+
+variavel porta = sistema.variavel("PORTA")
+se porta == nulo:
+    porta = "3000"
+fim
+escreva "Usando porta: " + porta
+
+variavel saida = sistema.executar("date")
+escreva "Data do sistema: " + saida
+```
+
+### Exemplo 4: API REST Completa com MySQL
 
 ```ms
 importar http de "http"
@@ -994,7 +1090,24 @@ servidor.escutar(3000)
 escreva "API Escola rodando na porta 3000!"
 ```
 
-### Exemplo 4: Trabalhando com Ficheiros e Módulos
+### Exemplo 5: Trabalhando com Strings e Arrays
+
+```ms
+variavel frase = "  Olá, Moçambique e o Mundo!  "
+
+escreva frase.aparar()
+escreva frase.aparar().maiuscula()
+escreva frase.aparar().tamanho()
+escreva frase.aparar().incluir("Moçambique")
+escreva frase.aparar().substituir("Mundo", "MambaScript")
+
+variavel palavras = frase.aparar().dividir(" ")
+para i de 0 ate palavras.tamanho() - 1:
+    escreva palavras[i]
+fim
+```
+
+### Exemplo 6: Trabalhando com Ficheiros e Módulos
 
 ```ms
 importar matematica de "matematica"
