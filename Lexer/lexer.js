@@ -221,6 +221,8 @@ class Lexer {
                 '(': 'LPAREN',
                 ')': 'RPAREN',
                 '[': 'LBRACKET',
+                'cada': 'CADA',
+                'em': 'EM',
                 ']': 'RBRACKET',
                 '{': 'LBRACE',      // ✅ NOVO
                 '}': 'RBRACE',      // ✅ NOVO

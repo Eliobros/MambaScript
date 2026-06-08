@@ -110,6 +110,22 @@ break
 case 'Continue':
     this.hasContinued = true;
     return;
+    
+    case 'ForEach': {
+    const lista = await this.evaluate(node.iterable);
+    for (const item of lista) {
+        this.variables[node.varName] = item;
+        for (const stmt of node.body) {
+            await this.executeStatement(stmt);
+            if (this.hasContinued) break;
+            if (this.hasBreaked || this.hasReturned) break;
+        }
+        if (this.hasContinued) { this.hasContinued = false; continue; }
+        if (this.hasBreaked) { this.hasBreaked = false; break; }
+        if (this.hasReturned) return;
+    }
+    break;
+}
 
 case 'Switch':
     const switchValue = await this.evaluate(node.value);

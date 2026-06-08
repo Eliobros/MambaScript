@@ -323,27 +323,39 @@ switchStatement() {
     }
 
     forStatement() {
-        this.advance(); // pular 'para'
+    this.advance(); // pular 'para'
+
+    // para cada item em lista:
+    if (this.currentToken && this.currentToken.type === 'CADA') {
+        this.advance(); // pular 'cada'
         const varName = this.expect('IDENTIFIER').value;
-        this.expect('DE');
-        const start = this.expression();
-        this.expect('ATE');
-        const end = this.expression();
+        this.expect('EM');
+        const iterable = this.expression();
         this.expect('COLON');
 
         const body = [];
-        while (
-            this.currentToken &&
-            this.currentToken.type !== 'END' &&
-            this.currentToken.type !== 'EOF'
-        ) {
+        while (this.currentToken && this.currentToken.type !== 'END' && this.currentToken.type !== 'EOF') {
             body.push(this.statement());
         }
-
         this.expect('END');
-
-        return { type: 'For', varName, start, end, body };
+        return { type: 'ForEach', varName, iterable, body };
     }
+
+    // para i de 1 ate 10: (lógica original)
+    const varName = this.expect('IDENTIFIER').value;
+    this.expect('DE');
+    const start = this.expression();
+    this.expect('ATE');
+    const end = this.expression();
+    this.expect('COLON');
+
+    const body = [];
+    while (this.currentToken && this.currentToken.type !== 'END' && this.currentToken.type !== 'EOF') {
+        body.push(this.statement());
+    }
+    this.expect('END');
+    return { type: 'For', varName, start, end, body };
+}
 
     importStatement() {
     this.advance(); // pular 'importar'
