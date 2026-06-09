@@ -7,22 +7,13 @@ const http = require('http');
 const tar = require('tar');
 const os = require('os');
 
-
-
-// Registry oficial MambaScript
-//7const REGISTRY_URL = process.env.MAMBAS_REGISTRY || 'http://localhost:3004';
-
+// ======================== CONFIGURAÇÕES ========================
 const REGISTRY_URL = process.env.MAMBAS_REGISTRY || 'https://habibo-mambascript-registry.mozhost.shop';
 
-// Pasta de módulos do projeto atual
 const MODULOS_DIR = path.join(process.cwd(), 'modulos_mambas');
-
-// Arquivo de registro de pacotes instalados
 const REGISTRO_PATH = path.join(MODULOS_DIR, '.registro.json');
 
-// ─────────────────────────────────────────────
-// Utilitários
-// ─────────────────────────────────────────────
+// ======================== UTILITÁRIOS ========================
 
 function garantirPasta() {
     if (!fs.existsSync(MODULOS_DIR)) {
@@ -43,25 +34,40 @@ function salvarRegistro(registro) {
     fs.writeFileSync(REGISTRO_PATH, JSON.stringify(registro, null, 2));
 }
 
+function carregarMambaJsonProjeto() {
+    const caminho = path.join(process.cwd(), 'mamba.json');
+    if (!fs.existsSync(caminho)) return null;
+    try {
+        return JSON.parse(fs.readFileSync(caminho, 'utf-8'));
+    } catch {
+        console.warn('⚠️  mamba.json existe mas está inválido.');
+        return null;
+    }
+}
+
+function salvarMambaJsonProjeto(meta) {
+    const caminho = path.join(process.cwd(), 'mamba.json');
+    fs.writeFileSync(caminho, JSON.stringify(meta, null, 2));
+    console.log('📝 mamba.json do projeto atualizado automaticamente.');
+}
+
+// ======================== DOWNLOAD ========================
+
 function get(url, token = null) {
     return new Promise((resolve, reject) => {
         const client = url.startsWith('https') ? https : http;
         const headers = { 'User-Agent': 'MambaScript-Instalador' };
         if (token) headers['Authorization'] = `Bearer ${token}`;
 
-        const options = { headers };
-        client.get(url, options, (res) => {
+        client.get(url, { headers }, (res) => {
             if (res.statusCode === 301 || res.statusCode === 302) {
                 return get(res.headers.location, token).then(resolve).catch(reject);
             }
             let data = '';
             res.on('data', chunk => data += chunk);
             res.on('end', () => {
-                if (res.statusCode === 200) {
-                    resolve(data);
-                } else {
-                    reject(new Error(`HTTP ${res.statusCode}`));
-                }
+                if (res.statusCode === 200) resolve(data);
+                else reject(new Error(`HTTP ${res.statusCode}`));
             });
         }).on('error', reject);
     });
@@ -70,65 +76,94 @@ function get(url, token = null) {
 function download(url, destino) {
     return new Promise((resolve, reject) => {
         const client = url.startsWith('https') ? https : http;
-        const options = {
-            headers: { 'User-Agent': 'MambaScript-Instalador' }
-        };
-        client.get(url, options, (res) => {
-            // Seguir redirects
+        client.get(url, { headers: { 'User-Agent': 'MambaScript-Instalador' } }, (res) => {
             if (res.statusCode === 301 || res.statusCode === 302) {
                 return download(res.headers.location, destino).then(resolve).catch(reject);
             }
-            if (res.statusCode !== 200) {
-                return reject(new Error(`HTTP ${res.statusCode}`));
-            }
+            if (res.statusCode !== 200) return reject(new Error(`HTTP ${res.statusCode}`));
+
             const file = fs.createWriteStream(destino);
             res.pipe(file);
-            file.on('finish', () => file.close(resolve));
+            file.on('finish', () => { file.close(); resolve(); });
             file.on('error', reject);
         }).on('error', reject);
     });
 }
 
-// ─────────────────────────────────────────────
-// Comandos
-// ─────────────────────────────────────────────
+// ======================== COMANDOS ========================
+
+function init() {
+    const caminho = path.join(process.cwd(), 'mamba.json');
+    
+    if (fs.existsSync(caminho)) {
+        console.log('⚠️  mamba.json já existe neste projeto.');
+        return;
+    }
+
+    const template = {
+        "nome": path.basename(process.cwd()),
+        "versao": "1.0.0",
+        "descricao": "Meu projeto em MambaScript",
+        "autor": "seu-usuario",
+        "principal": "index.ms",
+        "palavrasChave": [],
+        "licenca": "MIT",
+        "dependencias": {},
+        "mamba": {
+            "minVersion": "1.5.0",
+            "tipo": "module"
+        }
+    };
+
+    fs.writeFileSync(caminho, JSON.stringify(template, null, 2));
+    console.log('✅ mamba.json criado com sucesso!');
+    console.log('💡 Edite o arquivo conforme sua necessidade.');
+}
 
 async function instalar(nomePacote) {
     if (!nomePacote) {
-        console.error('❌ Uso: mambas instalar <pacote>');
+        console.error('❌ Uso: mambas instalar <pacote>[@versao]');
         process.exit(1);
     }
 
-    console.log(`📦 Instalando pacote: ${nomePacote}...`);
+    const [nome, versaoEspecifica] = nomePacote.split('@');
+    console.log(`📦 Instalando ${nome}${versaoEspecifica ? `@${versaoEspecifica}` : ''}...`);
+
     garantirPasta();
 
     // Buscar metadados
-    let meta = { versao: '1.0.0', descricao: '' };
+    let meta;
     try {
         const lista = JSON.parse(await get(`${REGISTRY_URL}/pacotes`));
-        const encontrado = lista.find(p => p.nome === nomePacote);
-        if (!encontrado) {
-            console.error(`❌ Pacote "${nomePacote}" não encontrado.`);
+        meta = lista.find(p => p.nome === nome);
+        
+        if (!meta) {
+            console.error(`❌ Pacote "${nome}" não encontrado.`);
             console.error(`💡 Use "mambas procurar" para ver pacotes disponíveis.`);
             process.exit(1);
         }
-        meta = encontrado;
     } catch (e) {
-        console.error(`❌ Não foi possível conectar ao registry: ${e.message}`);
+        console.error(`❌ Erro ao conectar ao registry: ${e.message}`);
         process.exit(1);
     }
 
-    // Baixar .tgz
-    const tmpPath = path.join(os.tmpdir(), `${nomePacote}.tgz`);
+    const versaoFinal = versaoEspecifica || meta.versao;
+
+    // Download
+    const tmpPath = path.join(os.tmpdir(), `${nome}.tgz`);
     try {
-        await download(`${REGISTRY_URL}/pacotes/${nomePacote}/download`, tmpPath);
+        const urlDownload = versaoEspecifica 
+            ? `${REGISTRY_URL}/pacotes/${nome}/download?versao=${versaoFinal}`
+            : `${REGISTRY_URL}/pacotes/${nome}/download`;
+        
+        await download(urlDownload, tmpPath);
     } catch (e) {
-        console.error(`❌ Erro ao baixar: ${e.message}`);
+        console.error(`❌ Erro ao baixar ${nome}@${versaoFinal}: ${e.message}`);
         process.exit(1);
     }
 
-    // Extrair em modulos_mambas/<nome>/
-    const destino = path.join(MODULOS_DIR, nomePacote);
+    // Extrair
+    const destino = path.join(MODULOS_DIR, nome);
     fs.mkdirSync(destino, { recursive: true });
 
     try {
@@ -139,17 +174,28 @@ async function instalar(nomePacote) {
         process.exit(1);
     }
 
-    // Atualizar registro
+    // Atualizar registro local
     const registro = carregarRegistro();
-    registro[nomePacote] = {
-        versao: meta.versao || '1.0.0',
+    registro[nome] = {
+        versao: versaoFinal,
         descricao: meta.descricao || '',
         instaladoEm: new Date().toISOString()
     };
     salvarRegistro(registro);
 
-    console.log(`✅ Pacote "${nomePacote}" v${meta.versao} instalado!`);
-    console.log(`💡 Use: importar ${nomePacote} de "${nomePacote}"`);
+    // Atualizar mamba.json do projeto
+    let projeto = carregarMambaJsonProjeto();
+    if (projeto) {
+        if (!projeto.dependencias) projeto.dependencias = {};
+        projeto.dependencias[nome] = `^${versaoFinal}`;
+        salvarMambaJsonProjeto(projeto);
+    } else {
+        console.log('ℹ️  Nenhum mamba.json encontrado no projeto (use "mambas init").');
+    }
+
+    console.log(`✅ ${nome}@${versaoFinal} instalado com sucesso!`);
+    console.log(`💡 Use: importar ${nome} de "${nome}"`);
+    process.exit(0);
 }
 
 async function remover(nomePacote) {
@@ -166,9 +212,9 @@ async function remover(nomePacote) {
     }
 
     const pasta = path.join(MODULOS_DIR, nomePacote);
-if (fs.existsSync(pasta)) {
-    fs.rmSync(pasta, { recursive: true, force: true });
-}
+    if (fs.existsSync(pasta)) {
+        fs.rmSync(pasta, { recursive: true, force: true });
+    }
 
     delete registro[nomePacote];
     salvarRegistro(registro);
@@ -181,8 +227,8 @@ function listar() {
     const pacotes = Object.keys(registro);
 
     if (pacotes.length === 0) {
-        console.log('📭 Nenhum pacote instalado.');
-        console.log('💡 Use "mambas procurar" para ver pacotes disponíveis no registry.');
+        console.log('📭 Nenhum pacote instalado localmente.');
+        console.log('💡 Use "mambas instalar <pacote>"');
         return;
     }
 
@@ -196,45 +242,40 @@ function listar() {
 async function procurar(termo) {
     console.log('🔍 Buscando pacotes disponíveis...\n');
 
-    let pacotes;
     try {
-        pacotes = JSON.parse(await get(`${REGISTRY_URL}/pacotes`));
+        const pacotes = JSON.parse(await get(`${REGISTRY_URL}/pacotes`));
+        const registro = carregarRegistro();
+
+        let resultado = pacotes;
+
+        if (termo) {
+            const t = termo.toLowerCase();
+            resultado = pacotes.filter(p =>
+                p.nome.toLowerCase().includes(t) ||
+                (p.descricao && p.descricao.toLowerCase().includes(t))
+            );
+        }
+
+        if (resultado.length === 0) {
+            console.log(termo ? `📭 Nenhum pacote encontrado para "${termo}".` : '📭 Nenhum pacote disponível ainda.');
+            return;
+        }
+
+        console.log(`📦 Pacotes encontrados (${resultado.length}):\n`);
+        for (const p of resultado) {
+            const instalado = registro[p.nome] ? ' ✅ (instalado)' : '';
+            console.log(`  • ${p.nome} v${p.versao} — ${p.descricao || 'Sem descrição'}${instalado}`);
+        }
     } catch (e) {
-        console.error(`❌ Não foi possível conectar ao registry: ${e.message}`);
-        console.error('💡 Verifique sua conexão com a internet.');
-        process.exit(1);
-    }
-
-    if (!pacotes || pacotes.length === 0) {
-        console.log('📭 Nenhum pacote disponível ainda.');
-        return;
-    }
-
-    // Filtrar por termo de busca se fornecido
-    const resultado = termo
-        ? pacotes.filter(p =>
-            p.nome.includes(termo) ||
-            (p.descricao && p.descricao.includes(termo))
-          )
-        : pacotes;
-
-    if (resultado.length === 0) {
-        console.log(`📭 Nenhum pacote encontrado para "${termo}".`);
-        return;
-    }
-
-    const registro = carregarRegistro();
-    console.log(`📦 Pacotes disponíveis (${resultado.length}):\n`);
-    for (const p of resultado) {
-        const instalado = registro[p.nome] ? ' ✅ instalado' : '';
-        console.log(`  • ${p.nome} v${p.versao} — ${p.descricao}${instalado}`);
+        console.error(`❌ Erro ao buscar pacotes: ${e.message}`);
     }
 }
 
 async function whoami() {
-    const tokenPath = path.join(require('os').homedir(), '.mambas', 'token');
+    const tokenPath = path.join(os.homedir(), '.mambas', 'token');
+    
     if (!fs.existsSync(tokenPath)) {
-        console.error('❌ Não autenticado.');
+        console.error('❌ Você não está autenticado.');
         console.error('💡 Use: mambas login <token>');
         process.exit(1);
     }
@@ -248,7 +289,7 @@ async function whoami() {
         console.log(`📧 Email    : ${data.email}`);
         console.log(`📅 Membro desde: ${new Date(data.criadoEm).toLocaleDateString('pt-BR')}`);
     } catch (e) {
-        console.error(`❌ Erro: ${e.message}`);
+        console.error(`❌ Erro ao buscar informações: ${e.message}`);
     }
 }
 
@@ -257,20 +298,19 @@ function ajuda() {
 🐍 MambaScript — Gestor de Pacotes
 
 Uso:
-  mambas <arquivo.ms>              Executa um arquivo MambaScript
-  mambas instalar <pacote>         Instala um pacote do registry
-  mambas remover <pacote>          Remove um pacote instalado
-  mambas listar                    Lista pacotes instalados localmente
-  mambas procurar [termo]          Busca pacotes no registry
-  mambas ajuda                     Mostra esta mensagem
+  mambas init                    → Cria um mamba.json novo
+  mambas instalar <pacote>[@versao]   → Instala um pacote
+  mambas remover <pacote>        → Remove um pacote
+  mambas listar                  → Lista pacotes instalados
+  mambas procurar [termo]        → Busca pacotes no registry
+  mambas whoami                  → Mostra usuário logado
+  mambas ajuda                   → Mostra esta ajuda
 
 Registry atual: ${REGISTRY_URL}
-💡 Para usar outro registry: MAMBAS_REGISTRY=https://... mambas instalar <pacote>
     `);
 }
 
-// ─────────────────────────────────────────────
-// Exporta os comandos
-// ─────────────────────────────────────────────
+// ======================== EXECUÇÃO ========================
 
-module.exports = { instalar, remover, listar, procurar, ajuda, whoami };
+
+module.exports = { instalar, remover, listar, procurar, ajuda, whoami, init };

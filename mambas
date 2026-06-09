@@ -36,6 +36,9 @@ if (comando === 'instalar') {
     const pkg = require('./package.json');
     console.log(`MambaScript v${pkg.version}`);
     process.exit(0);
+} else if (comando === 'init') {
+    const { init } = require('./Instalador/instalador');
+    init();
 } else if (!comando) {
     ajuda();
 } else {
