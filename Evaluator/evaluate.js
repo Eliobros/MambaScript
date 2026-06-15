@@ -20,7 +20,9 @@ class Evaluator {
             'caminho': this.createPathModule(),
             'http': this.createHttpModule(this),
             'mysql': this.createMysqlModule(),
-            'sistema': this.createSistemaModule()
+            'sistema': this.createSistemaModule(),
+            'crypto': this.createCryptoModule(),
+             'bcrypt': this.createBcryptModule()  
         };
     }
 
@@ -822,6 +824,35 @@ case 'Switch':
         args: () => process.argv.slice(2),
         pid: () => process.pid,
         memoria: () => process.memoryUsage()
+    };
+}
+
+createCryptoModule() {
+    const crypto = require('crypto');
+    return {
+        hash: (texto, algoritmo) => {
+            return crypto.createHash(algoritmo || 'sha256').update(texto).digest('hex');
+        },
+        md5: (texto) => crypto.createHash('md5').update(texto).digest('hex'),
+        sha256: (texto) => crypto.createHash('sha256').update(texto).digest('hex'),
+        sha512: (texto) => crypto.createHash('sha512').update(texto).digest('hex'),
+        aleatorio: (tamanho) => crypto.randomBytes(tamanho || 16).toString('hex')
+    };
+}
+
+createBcryptModule() {
+    let bcrypt;
+    try {
+        bcrypt = require('bcryptjs');
+    } catch (e) {
+        return new Proxy({}, {
+            get: () => () => { throw new Error(`❌ Módulo "bcrypt" requer bcryptjs. Execute: npm install bcryptjs`); }
+        });
+    }
+    return {
+        hashSenha: (senha, rounds) => bcrypt.hashSync(senha, rounds || 10),
+        verificar: (senha, hash) => bcrypt.compareSync(senha, hash),
+        salt: (rounds) => bcrypt.genSaltSync(rounds || 10)
     };
 }
 
