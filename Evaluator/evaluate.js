@@ -11,8 +11,25 @@ class Evaluator {
             'hoje': this.createDateObject.bind(this),
             'ler': this.lerInput.bind(this),
             'json_ler': this.jsonLer.bind(this),
+            
             'json_texto': this.jsonTexto.bind(this),
-            'json_escrever': this.jsonEscrever.bind(this)
+            'json_escrever': this.jsonEscrever.bind(this),
+            'vermelho': (texto) => `\x1b[31m${texto}\x1b[0m`,
+            'verde': (texto) => `\x1b[32m${texto}\x1b[0m`,
+            'amarelo': (texto) => `\x1b[33m${texto}\x1b[0m`,
+            'azul': (texto) => `\x1b[34m${texto}\x1b[0m`,
+            'magenta': (texto) => `\x1b[35m${texto}\x1b[0m`,
+            'ciano': (texto) => `\x1b[36m${texto}\x1b[0m`,
+            'branco': (texto) => `\x1b[37m${texto}\x1b[0m`,
+            'rosa': (texto) => `\x1b[95m${texto}\x1b[0m`,
+            'laranja': (texto) => `\x1b[91m${texto}\x1b[0m`,
+            'negrito': (texto) => `\x1b[1m${texto}\x1b[0m`,
+            
+            // Utilitários de log
+            'alerta': (texto) => `\x1b[33m⚠ ALERTA: ${texto}\x1b[0m`,
+            'erro': (texto) => `\x1b[31m✖ ERRO: ${texto}\x1b[0m`,
+            'dica': (texto) => `\x1b[36m💡 DICA: ${texto}\x1b[0m`,
+            'sucesso': (texto) => `\x1b[32m✔ SUCESSO: ${texto}\x1b[0m`,
         };
         this.builtinModules = {
             'fs': this.createFsModule(),
