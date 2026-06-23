@@ -162,7 +162,7 @@ class Parser {
 
     printStatement() {
         this.advance();
-        const value = this.expression();
+        const value = this.comparison();
         return { type: 'Print', value };
     }
 
@@ -170,7 +170,7 @@ class Parser {
         this.advance();
         const name = this.expect('IDENTIFIER').value;
         this.expect('ASSIGN');
-        const value = this.expression();
+        const value = this.comparison();
         return { type: 'VarDeclaration', name, value };
     }
     
@@ -186,7 +186,7 @@ continueStatement() {
 
 switchStatement() {
     this.advance(); // pular 'escolher'
-    const value = this.expression();
+    const value = this.comparison();
     this.expect('COLON');
 
     const cases = [];
@@ -199,7 +199,7 @@ switchStatement() {
     ) {
         if (this.currentToken.type === 'CASE') {
             this.advance(); // pular 'caso'
-            const caseValue = this.expression();
+            const caseValue = this.comparison();
             this.expect('COLON');
 
             const body = [];
@@ -318,7 +318,7 @@ switchStatement() {
 
     returnStatement() {
         this.advance();
-        const value = this.expression();
+        const value = this.comparison();
         return { type: 'Return', value };
     }
 
@@ -330,7 +330,7 @@ switchStatement() {
         this.advance(); // pular 'cada'
         const varName = this.expect('IDENTIFIER').value;
         this.expect('EM');
-        const iterable = this.expression();
+        const iterable = this.comparison();
         this.expect('COLON');
 
         const body = [];
@@ -344,9 +344,9 @@ switchStatement() {
     // para i de 1 ate 10: (lógica original)
     const varName = this.expect('IDENTIFIER').value;
     this.expect('DE');
-    const start = this.expression();
+    const start = this.comparison();
     this.expect('ATE');
-    const end = this.expression();
+    const end = this.comparison();
     this.expect('COLON');
 
     const body = [];
@@ -400,7 +400,7 @@ switchStatement() {
             };
         } else if (this.currentToken.type === 'LBRACKET') {
             this.advance();
-            const index = this.expression();
+            const index = this.comparison();
             this.expect('RBRACKET');
             target = {
                 type: 'IndexAccess',
@@ -411,7 +411,7 @@ switchStatement() {
     }
 
     this.expect('ASSIGN');
-    const value = this.expression();
+    const value = this.comparison();
     return { type: 'Assignment', name: target, value };
 }
 
@@ -572,7 +572,7 @@ switchStatement() {
                 const args = [];
 
                 while (this.currentToken.type !== 'RPAREN') {
-                    args.push(this.expression());
+                    args.push(this.comparison());
                     if (this.currentToken.type === 'COMMA') {
                         this.advance();
                     }
@@ -585,7 +585,7 @@ switchStatement() {
             // ARRAY ACCESS
             if (this.currentToken && this.currentToken.type === 'LBRACKET') {
                 this.advance();
-                const index = this.expression();
+                const index = this.comparison();
                 this.expect('RBRACKET');
                 result = { type: 'ArrayAccess', array: result, index };
             }
@@ -600,7 +600,7 @@ switchStatement() {
                     const args = [];
 
                     while (this.currentToken.type !== 'RPAREN') {
-                        args.push(this.expression());
+                        args.push(this.comparison());
                         if (this.currentToken.type === 'COMMA') {
                             this.advance();
                         }
@@ -627,7 +627,7 @@ switchStatement() {
 
         if (token.type === 'LPAREN') {
             this.advance();
-            const expr = this.expression();
+            const expr = this.comparison();
             this.expect('RPAREN');
             return expr;
         }
@@ -677,7 +677,7 @@ switchStatement() {
         const elements = [];
 
         while (this.currentToken && this.currentToken.type !== 'RBRACKET') {
-            elements.push(this.expression());
+            elements.push(this.comparison());
             if (this.currentToken.type === 'COMMA') {
                 this.advance();
             }
@@ -715,7 +715,7 @@ switchStatement() {
             this.expect('COLON');
 
             // Valor da propriedade
-            const value = this.expression();
+            const value = this.comparison();
 
             properties[key] = value;
 

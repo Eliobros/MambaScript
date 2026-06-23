@@ -112,6 +112,8 @@ class Lexer {
             'funcao': 'FUNCTION',
             'retorna': 'RETURN',
             'fim': 'END',
+            'cada': 'CADA',
+            'em': 'EM',
             'importar': 'IMPORT',
             'e': 'AND',
             'ou': 'OR',
@@ -221,8 +223,6 @@ class Lexer {
                 '(': 'LPAREN',
                 ')': 'RPAREN',
                 '[': 'LBRACKET',
-                'cada': 'CADA',
-                'em': 'EM',
                 ']': 'RBRACKET',
                 '{': 'LBRACE',      // ✅ NOVO
                 '}': 'RBRACE',      // ✅ NOVO

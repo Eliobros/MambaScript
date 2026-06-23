@@ -39,7 +39,7 @@ class Evaluator {
             'mysql': this.createMysqlModule(),
             'sistema': this.createSistemaModule(),
             'crypto': this.createCryptoModule(),
-             'bcrypt': this.createBcryptModule()  
+             'bcrypt': this.createBcryptModule()
         };
     }
 
@@ -47,7 +47,7 @@ class Evaluator {
         for (const statement of ast.body) {
             await this.executeStatement(statement);
         }
-    }
+    } 
 
     async chamarFuncaoMamba(func, argumentosPassados) {
         const oldVars = { ...this.variables };
