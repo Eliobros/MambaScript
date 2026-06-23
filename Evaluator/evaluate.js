@@ -476,7 +476,7 @@ if (methodName === 'substring') {
     const inicio = await this.evaluate(args[0]);
     const fim = args[1] ? await this.evaluate(args[1]) : undefined;
     return obj.substring(inicio, fim);
-
+}
 }
 
         // NUMBER METHODS
