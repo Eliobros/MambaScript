@@ -467,6 +467,16 @@ case 'Switch':
         const fim = args[1] ? await this.evaluate(args[1]) : undefined;
         return obj.slice(inicio, fim);
     }
+    
+    if (methodName === 'indice_de') {
+    const sub = await this.evaluate(args[0]);
+    return obj.indexOf(sub);
+}
+if (methodName === 'substring') {
+    const inicio = await this.evaluate(args[0]);
+    const fim = args[1] ? await this.evaluate(args[1]) : undefined;
+    return obj.substring(inicio, fim);
+
 }
 
         // NUMBER METHODS
