@@ -1,11 +1,131 @@
+class AvaliadorErro extends Error {
+    constructor({ titulo, mensagem, linha, coluna, origem, dica, contexto }) {
+        let msg = `❌ ${titulo}`;
+        if (origem) msg += ` em ${origem}`;
+        if (linha) msg += ` (linha ${linha}` + (coluna ? `, coluna ${coluna}` : '') + `)`;
+        msg += `:\n   ${mensagem}`;
+        if (contexto) msg += '\n\n' + contexto;
+        if (dica) msg += `\n\n💡 ${dica}`;
+        super(msg);
+        this.name = 'AvaliadorErro';
+        this._mambaFormatado = true;
+        this.linha = linha;
+        this.coluna = coluna;
+    }
+}
+
+class AvaliadorHelpers {
+    static carregarFonte(filePath) {
+        try {
+            const fs = require('fs');
+            if (typeof filePath === 'string' && fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+                return fs.readFileSync(filePath, 'utf-8');
+            }
+        } catch (e) {}
+        return null;
+    }
+
+    static dicaPara(msg) {
+        if (!msg) return null;
+        let m;
+        if (msg.includes('Fim inesperado do código')) return 'Verifica se abriu e fechou todos os blocos com "fim".';
+        if (msg.includes('Statement inválido')) return 'Verifica a sintaxe logo acima. Talvez falte um "fim" de um bloco anterior ou um ":" depois da condição.';
+        if (msg.includes('Token inesperado')) return 'Verifica parênteses, vírgulas ou dois-pontos na linha acima.';
+        if (msg.startsWith('Esperava')) return 'Falta um símbolo obrigatório nessa posição. Verifica a sintaxe do comando anterior.';
+        if ((m = msg.match(/Variável não definida: (\w+)/))) return `Você esqueceu de declarar com 'variavel ${m[1]} = ...' antes de usar?`;
+        if ((m = msg.match(/Função não definida: (\w+)/))) return `A função "${m[1]}" precisa ser declarada com 'funcao ${m[1]}(...)' antes de ser chamada.`;
+        if ((m = msg.match(/Método não encontrado: (\w+)/))) return `Esse método não existe para esse tipo de valor. Métodos comuns: "tamanho()", "paraTexto()", "aparar()", "maiuscula()", "minuscula()", "incluir()" etc.`;
+        if (msg.includes('O valor do tipo')) return 'Esse valor não tem métodos. Talvez seja "nulo"? Atribui um valor antes de tentar acessar.';
+        if (msg.includes('Índice') && msg.includes('fora dos limites')) return 'O array não tem elemento nesse índice. Verifica o tamanho com ".tamanho()" e usa um índice válido.';
+        if (msg.includes('Índice deve ser um número')) return 'O índice do array precisa ser número (não pode ser texto nem booleano).';
+        if (msg.includes('Tentativa de acessar')) return 'Tens a certeza que esse valor é um array ou objeto? Atribui um array/objeto antes de acessar índice ou propriedade.';
+        if (msg.includes('em valor nulo') || msg.includes('em valor null')) return 'O valor é nulo. Verifica se a variável contém o valor esperado antes de acessar propriedade.';
+        if (msg.includes('Tipos') || msg.includes('permitida apenas entre')) return 'Estás a misturar tipos diferentes (número + texto). Converte com ".paraNumero()" ou ".paraTexto()" antes de operar.';
+        if (msg.includes('Não é possível somar')) return 'Estás a somar valores de tipos diferentes. Concatena textos com "+", soma números com "+". Para juntar números como texto usa ".paraTexto()".';
+        if (msg.includes('Nó inválido') || msg.includes('Expressão incompleta')) return 'A expressão parece estar incompleta. Verifica parênteses, vírgulas ou operadores.';
+        if (msg.includes('não é um número válido')) return 'A string não representa um número válido. Verifica o conteúdo (deve ser só dígitos, opcionalmente com ponto decimal).';
+        if (msg.includes('Erro HTTP')) return 'Verifica a URL, conexão de rede, ou se o servidor remoto está acessível.';
+        if (msg.includes('Division') || msg.includes('divisão por zero')) return 'Não podes dividir por zero. Garante que o divisor é diferente de zero.';
+        return null;
+    }
+
+    static gerarSnippet(sourceText, linha, coluna) {
+        if (!sourceText || !linha) return null;
+        const lines = sourceText.split('\n');
+        const target = lines[linha - 1];
+        if (target === undefined) return null;
+        const numWidth = String(lines.length).length;
+        const numPad = (n) => String(n).padStart(numWidth, ' ');
+        const antes = linha > 1 ? `   ${numPad(linha - 1)} | ${lines[linha - 2]}\n` : '';
+        const principal = `   ${numPad(linha)} | ${target}\n`;
+        const linhaCol = ' '.repeat(Math.max(0, (coluna || 0)));
+        const seta = `     | ${linhaCol}^`;
+        return `${antes}${principal}${seta}`;
+    }
+
+    static origemCurta(filePath) {
+        if (!filePath) return null;
+        const parts = String(filePath).split(/[\\/]/);
+        return parts[parts.length - 1] || null;
+    }
+}
+
+// Cadeia de escopos com parent chain — permite closures reais e
+// isola cada call frame (resolve race condition em HTTP paralelo).
+class Environment {
+    constructor(parent = null, isGlobal = false) {
+        this.parent = parent;
+        // Object.create(null) evita colisão com propriedades herdadas
+        // como "constructor", "toString", "__proto__".
+        this.vars = Object.create(null);
+        this.isGlobal = isGlobal;
+        // Flags de fluxo de controle pertencem a CADA call frame,
+        // não ao Evaluator. Isso elimina race conditions entre requests.
+        this.hasReturned = false;
+        this.hasBreaked = false;
+        this.hasContinued = false;
+        this.returnValue = undefined;
+    }
+
+    define(name, value) {
+        this.vars[name] = value;
+    }
+
+    get(name) {
+        if (Object.prototype.hasOwnProperty.call(this.vars, name)) {
+            return this.vars[name];
+        }
+        if (this.parent) return this.parent.get(name);
+        throw new Error(`Variável não definida: ${name}`);
+    }
+
+    set(name, value) {
+        if (Object.prototype.hasOwnProperty.call(this.vars, name)) {
+            this.vars[name] = value;
+            return;
+        }
+        if (this.parent) {
+            this.parent.set(name, value);
+            return;
+        }
+        throw new Error(`Variável não definida: ${name}`);
+    }
+
+    has(name) {
+        if (Object.prototype.hasOwnProperty.call(this.vars, name)) return true;
+        if (this.parent) return this.parent.has(name);
+        return false;
+    }
+}
+
 class Evaluator {
     constructor(filePath) {
         this.filePath = filePath || process.cwd();
-        this.variables = {};
+        this.sourceText = AvaliadorHelpers.carregarFonte(this.filePath);
+        // Cadeia de escopos: globalEnv -> ... -> callEnv -> ...
+        this.globalEnv = new Environment(null, true);
+        this.env = this.globalEnv;
         this.functions = {};
-        this.hasBreaked = false;
-        this.hasContinued = false;
-        this.returnValue = null;
         
         this.builtinFunctions = {
             'hoje': this.createDateObject.bind(this),
@@ -51,30 +171,72 @@ class Evaluator {
     } 
 
     async chamarFuncaoMamba(func, argumentosPassados) {
-        const oldVars = { ...this.variables };
-        const oldReturnValue = this.returnValue;
-        this.returnValue = null;
-        this.hasReturned = false;
-
+        // Cada request HTTP entra aqui. Como agora cada chamada
+        // cria o seu próprio Environment (com flags de fluxo isolados),
+        // requests paralelos não corrompem mais um ao outro.
+        const callEnv = func.closure
+            ? new Environment(func.closure)
+            : new Environment(this.globalEnv);
         for (let i = 0; i < func.params.length; i++) {
-            this.variables[func.params[i]] = argumentosPassados[i];
+            callEnv.define(func.params[i], argumentosPassados[i]);
         }
-
-        for (const stmt of func.body) {
-            await this.executeStatement(stmt);
-            if (this.hasReturned) break;
+        const prevEnv = this.env;
+        let returnValue;
+        try {
+            this.env = callEnv;
+            for (const stmt of func.body) {
+                await this.executeStatement(stmt);
+                if (this.env.hasReturned) break;
+            }
+            returnValue = this.env.returnValue;
+        } finally {
+            this.env = prevEnv;
         }
+        return returnValue;
+    }
 
-        const result = this.returnValue;
-        this.variables = oldVars;
-        this.returnValue = oldReturnValue;
-        this.hasReturned = false;
+    _formatarComContexto(node, error) {
+        const msg = String((error && error.message) || error || '');
+        const linha = (node && node.line) || (error && error.linha);
+        const coluna = (node && node.column) || (error && error.coluna);
+        return new AvaliadorErro({
+            titulo: 'Erro MambaScript',
+            mensagem: msg,
+            linha,
+            coluna,
+            origem: AvaliadorHelpers.origemCurta(this.filePath),
+            dica: AvaliadorHelpers.dicaPara(msg),
+            contexto: AvaliadorHelpers.gerarSnippet(this.sourceText, linha, coluna),
+        });
+    }
 
-        return result;
+    // Helper: chama uma função de usuário criando novo Environment
+    // (parent = closure capturado na declaração) e restaurando o env anterior.
+    async _callUserFunction(func, args) {
+        const callEnv = new Environment(func.closure || this.globalEnv);
+        const evaluatedArgs = [];
+        for (const arg of args) evaluatedArgs.push(await this.evaluate(arg));
+        for (let i = 0; i < func.params.length; i++) {
+            callEnv.define(func.params[i], evaluatedArgs[i]);
+        }
+        const prevEnv = this.env;
+        let returnValue;
+        try {
+            this.env = callEnv;
+            for (const stmt of func.body) {
+                await this.executeStatement(stmt);
+                if (this.env.hasReturned) break;
+            }
+            returnValue = this.env.returnValue;
+        } finally {
+            this.env = prevEnv;
+        }
+        return returnValue;
     }
 
     async executeStatement(node) {
-        switch (node.type) {
+        try {
+            switch (node.type) {
             case 'Print':
                 const printValue = await this.evaluate(node.value);
                 if (printValue && printValue._type === 'DateObject') {
@@ -90,7 +252,7 @@ class Evaluator {
 
             case 'VarDeclaration':
                 const varValue = await this.evaluate(node.value);
-                this.variables[node.name] = varValue;
+                this.env.define(node.name, varValue);
                 break;
 
             case 'Assignment': {
@@ -110,12 +272,14 @@ class Evaluator {
     }
 
     if (node.name.type === 'Identifier') {
-        this.variables[node.name.name] = valor;
+        try { this.env.set(node.name.name, valor); }
+        catch (e) { this.env.define(node.name.name, valor); }
         return;
     }
 
     if (typeof node.name === 'string') {
-        this.variables[node.name] = valor;
+        try { this.env.set(node.name, valor); }
+        catch (e) { this.env.define(node.name, valor); }
         return;
     }
 
@@ -124,11 +288,11 @@ class Evaluator {
 break
                 
                 case 'Break':
-    this.hasBreaked = true;
+    this.env.hasBreaked = true;
     return;
 
 case 'Continue':
-    this.hasContinued = true;
+    this.env.hasContinued = true;
     return;
     
     case 'ForEach': {
@@ -137,26 +301,26 @@ case 'Continue':
     // Um nome (compatibilidade)
     if (node.varNames.length === 1) {
         for (const item of lista) {
-            this.variables[node.varNames[0]] = item;
+            this.env.define(node.varNames[0], item);
 
             for (const stmt of node.body) {
                 await this.executeStatement(stmt);
 
-                if (this.hasContinued) break;
-                if (this.hasBreaked || this.hasReturned) break;
+                if (this.env.hasContinued) break;
+                if (this.env.hasBreaked || this.env.hasReturned) break;
             }
 
-            if (this.hasContinued) {
-                this.hasContinued = false;
+            if (this.env.hasContinued) {
+                this.env.hasContinued = false;
                 continue;
             }
 
-            if (this.hasBreaked) {
-                this.hasBreaked = false;
+            if (this.env.hasBreaked) {
+                this.env.hasBreaked = false;
                 break;
             }
 
-            if (this.hasReturned) return;
+            if (this.env.hasReturned) return;
         }
     }
 
@@ -165,27 +329,27 @@ case 'Continue':
 
         for (const [chave, valor] of Object.entries(lista)) {
 
-            this.variables[node.varNames[0]] = chave;
-            this.variables[node.varNames[1]] = valor;
+            this.env.define(node.varNames[0], chave);
+            this.env.define(node.varNames[1], valor);
 
             for (const stmt of node.body) {
                 await this.executeStatement(stmt);
 
-                if (this.hasContinued) break;
-                if (this.hasBreaked || this.hasReturned) break;
+                if (this.env.hasContinued) break;
+                if (this.env.hasBreaked || this.env.hasReturned) break;
             }
 
-            if (this.hasContinued) {
-                this.hasContinued = false;
+            if (this.env.hasContinued) {
+                this.env.hasContinued = false;
                 continue;
             }
 
-            if (this.hasBreaked) {
-                this.hasBreaked = false;
+            if (this.env.hasBreaked) {
+                this.env.hasBreaked = false;
                 break;
             }
 
-            if (this.hasReturned) return;
+            if (this.env.hasReturned) return;
         }
     }
 
@@ -203,8 +367,8 @@ case 'Switch':
         if (matched) {
             for (const stmt of caso.body) {
                 await this.executeStatement(stmt);
-                if (this.hasBreaked) { this.hasBreaked = false; return; }
-                if (this.hasReturned) return;
+                if (this.env.hasBreaked) { this.env.hasBreaked = false; return; }
+                if (this.env.hasReturned) return;
             }
         }
     }
@@ -212,8 +376,8 @@ case 'Switch':
     if (!matched && node.defaultBody) {
         for (const stmt of node.defaultBody) {
             await this.executeStatement(stmt);
-            if (this.hasBreaked) { this.hasBreaked = false; return; }
-            if (this.hasReturned) return;
+            if (this.env.hasBreaked) { this.env.hasBreaked = false; return; }
+            if (this.env.hasReturned) return;
         }
     }
     break;
@@ -222,12 +386,12 @@ case 'Switch':
                 if (await this.evaluate(node.condition)) {
                     for (const stmt of node.body) {
                         await this.executeStatement(stmt);
-                        if (this.hasReturned) return;
+                        if (this.env.hasReturned) return;
                     }
                 } else if (node.elseBody) {
                     for (const stmt of node.elseBody) {
                         await this.executeStatement(stmt);
-                        if (this.hasReturned) return;
+                        if (this.env.hasReturned) return;
                     }
                 }
                 break;
@@ -236,40 +400,44 @@ case 'Switch':
     while (await this.evaluate(node.condition)) {
         for (const stmt of node.body) {
             await this.executeStatement(stmt);
-            if (this.hasContinued) break; // sai do for interno, relança o while
-            if (this.hasBreaked || this.hasReturned) break;
+            if (this.env.hasContinued) break; // sai do for interno, relança o while
+            if (this.env.hasBreaked || this.env.hasReturned) break;
         }
-        if (this.hasContinued) { this.hasContinued = false; continue; }
-        if (this.hasBreaked) { this.hasBreaked = false; break; }
-        if (this.hasReturned) return;
+        if (this.env.hasContinued) { this.env.hasContinued = false; continue; }
+        if (this.env.hasBreaked) { this.env.hasBreaked = false; break; }
+        if (this.env.hasReturned) return;
     }
     break;
 
             case 'FunctionDeclaration':
+                // closure: snapshot do escopo onde a função foi DECLARADA
+                // (permite que futuras chamadas vejam as variáveis capturadas)
                 this.functions[node.name] = {
+                    _type: 'MambaFunction',
                     params: node.params,
-                    body: node.body
+                    body: node.body,
+                    closure: this.env
                 };
                 break;
 
             case 'Return':
-                this.returnValue = await this.evaluate(node.value);
-                this.hasReturned = true;
+                this.env.returnValue = await this.evaluate(node.value);
+                this.env.hasReturned = true;
                 break;
 
             case 'For':
     const startVal = await this.evaluate(node.start);
     const endVal = await this.evaluate(node.end);
     for (let i = startVal; i <= endVal; i++) {
-        this.variables[node.varName] = i;
+        this.env.define(node.varName, i);
         for (const stmt of node.body) {
             await this.executeStatement(stmt);
-            if (this.hasContinued) break;
-            if (this.hasBreaked || this.hasReturned) break;
+            if (this.env.hasContinued) break;
+            if (this.env.hasBreaked || this.env.hasReturned) break;
         }
-        if (this.hasContinued) { this.hasContinued = false; continue; }
-        if (this.hasBreaked) { this.hasBreaked = false; break; }
-        if (this.hasReturned) return;
+        if (this.env.hasContinued) { this.env.hasContinued = false; continue; }
+        if (this.env.hasBreaked) { this.env.hasBreaked = false; break; }
+        if (this.env.hasReturned) return;
     }
     break;
             case 'Import':
@@ -284,13 +452,13 @@ case 'Switch':
                 try {
                     for (const stmt of node.body) {
                         await this.executeStatement(stmt);
-                        if (this.hasReturned) return;
+                        if (this.env.hasReturned) return;
                     }
                 } catch (e) {
-                    this.variables[node.errorVar] = e.message;
+                    this.env.define(node.errorVar, e.message);
                     for (const stmt of node.catchBody) {
                         await this.executeStatement(stmt);
-                        if (this.hasReturned) return;
+                        if (this.env.hasReturned) return;
                     }
                 }
                 break;
@@ -298,12 +466,17 @@ case 'Switch':
             default:
                 throw new Error(`Statement desconhecido: ${node.type}`);
         }
+        } catch (e) {
+            if (e && e._mambaFormatado) throw e;
+            throw this._formatarComContexto(node, e);
+        }
     }
 
     async evaluate(node) {
-        if (!node) throw new Error('Nó inválido');
+        if (!node) throw this._formatarComContexto(null, new Error('Nó inválido'));
 
-        switch (node.type) {
+        try {
+            switch (node.type) {
             case 'Number':
                 return node.value;
 
@@ -321,10 +494,15 @@ case 'Switch':
 
 
             case 'Identifier':
-                if (!(node.name in this.variables)) {
-                    throw new Error(`Variável não definida: ${node.name}`);
+                // 1) Procura no env (variáveis e funções capturadas em escopo léxico)
+                if (this.env.has(node.name)) {
+                    return this.env.get(node.name);
                 }
-                return this.variables[node.name];
+                // 2) Fallback: funções declaradas globalmente
+                if (Object.prototype.hasOwnProperty.call(this.functions, node.name)) {
+                    return this.functions[node.name];
+                }
+                throw new Error(`Variável não definida: ${node.name}`);
 
             case 'ArrayLiteral':
                 const elements = [];
@@ -344,7 +522,8 @@ case 'Switch':
                 return {
                     _type: 'MambaFunction',
                     params: node.params,
-                    body: node.body
+                    body: node.body,
+                    closure: this.env
                 };
 
             case 'ArrayAccess': {
@@ -424,27 +603,17 @@ case 'Switch':
                     for (const arg of node.args) args.push(await this.evaluate(arg));
                     return await this.builtinFunctions[node.name](...args);
                 }
-                if (!(node.name in this.functions)) {
-                    throw new Error(`Função não definida: ${node.name}`);
+                if (node.name in this.functions) {
+                    return await this._callUserFunction(this.functions[node.name], node.args);
                 }
-                const func = this.functions[node.name];
-                const oldVars = { ...this.variables };
-                const oldReturnValue = this.returnValue;
-                this.returnValue = null;
-                this.hasReturned = false;
-                this.variables = { ...this.variables };
-                for (let i = 0; i < func.params.length; i++) {
-                    this.variables[func.params[i]] = await this.evaluate(node.args[i]);
-                }
-                for (const stmt of func.body) {
-                    await this.executeStatement(stmt);
-                    if (this.hasReturned) break;
-                }
-                const result = this.returnValue;
-                this.variables = oldVars;
-                this.returnValue = oldReturnValue;
-                this.hasReturned = false;
-                return result !== undefined ? result : undefined;
+                // Variável pode conter uma função anônima (FunctionLiteral) — closure
+                try {
+                    const val = this.env.get(node.name);
+                    if (val && val._type === 'MambaFunction') {
+                        return await this._callUserFunction(val, node.args);
+                    }
+                } catch (e) { /* não é uma função aninhada */ }
+                throw new Error(`Função não definida: ${node.name}`);
 
             case 'LogicalOp':
                 if (node.operator === 'AND') return (await this.evaluate(node.left)) && (await this.evaluate(node.right));
@@ -461,6 +630,10 @@ case 'Switch':
 
             default:
                 throw new Error(`Tipo de nó desconhecido: ${node.type}`);
+        }
+        } catch (e) {
+            if (e && e._mambaFormatado) throw e;
+            throw this._formatarComContexto(node, e);
         }
     }
 
@@ -575,13 +748,13 @@ if (methodName === 'substring') {
     const { names, source } = node;
     const tempName = `__temp_${source}__`;
     await this.executeImport({ name: tempName, source });
-    const modulo = this.variables[tempName];
-    delete this.variables[tempName];
+    const modulo = this.env.get(tempName);
+    this.env.define(tempName, undefined);
     for (const nome of names) {
         if (!(nome in modulo)) {
             throw new Error(`❌ "${nome}" não existe no módulo "${source}"`);
         }
-        this.variables[nome] = modulo[nome];
+        this.env.define(nome, modulo[nome]);
     }
 }
 
@@ -589,7 +762,7 @@ if (methodName === 'substring') {
         const { name, source } = node;
 
         if (this.builtinModules[source]) {
-            this.variables[name] = this.builtinModules[source];
+            this.env.define(name, this.builtinModules[source]);
             return;
         }
 
@@ -633,27 +806,32 @@ if (methodName === 'substring') {
 
         const moduleExports = {};
         for (const [key] of Object.entries(moduleEvaluator.functions)) {
+            const funcRef = moduleEvaluator.functions[key];
             moduleExports[key] = async (...args) => {
-                const evalCopy = new Evaluator(resolvedPath);
-                evalCopy.functions = { ...moduleEvaluator.functions };
-                evalCopy.variables = { ...moduleEvaluator.variables };
-                evalCopy.returnValue = null;
-                const func = evalCopy.functions[key];
-                for (let i = 0; i < func.params.length; i++) {
-                    evalCopy.variables[func.params[i]] = args[i];
+                const callEnv = new Environment(funcRef.closure || moduleEvaluator.globalEnv);
+                for (let i = 0; i < funcRef.params.length; i++) {
+                    callEnv.define(funcRef.params[i], args[i]);
                 }
-                for (const stmt of func.body) {
-                    await evalCopy.executeStatement(stmt);
-                    if (evalCopy.hasReturned) break;
+                const prevEnv = moduleEvaluator.env;
+                let returnValue;
+                try {
+                    moduleEvaluator.env = callEnv;
+                    for (const stmt of funcRef.body) {
+                        await moduleEvaluator.executeStatement(stmt);
+                        if (moduleEvaluator.env.hasReturned) break;
+                    }
+                    returnValue = moduleEvaluator.env.returnValue;
+                } finally {
+                    moduleEvaluator.env = prevEnv;
                 }
-                return evalCopy.returnValue;
+                return returnValue;
             };
         }
-        for (const [key, value] of Object.entries(moduleEvaluator.variables)) {
+        for (const [key, value] of Object.entries(moduleEvaluator.globalEnv.vars)) {
             moduleExports[key] = value;
         }
 
-        this.variables[name] = moduleExports;
+        this.env.define(name, moduleExports);
     }
     
     
@@ -837,29 +1015,45 @@ if (methodName === 'substring') {
     };
 }
     createHttpModule(evaluator) {
-        const { execSync } = require('child_process');
+        const fetch = require('node-fetch');
 
-        const request = (method, url, corpo, cabecalhos) => {
+        const validarUrl = (url) => {
             try {
-                let cmd = `curl -s -w "\\n__STATUS__%{http_code}" -X ${method}`;
-                if (cabecalhos && typeof cabecalhos === 'object') {
-                    for (const [key, val] of Object.entries(cabecalhos)) cmd += ` -H "${key}: ${val}"`;
+                const urlObj = new URL(url);
+                if (!['http:', 'https:'].includes(urlObj.protocol)) {
+                    throw new Error(`Protocolo "${urlObj.protocol}" não permitido. Use http: ou https:.`);
                 }
-                if (corpo) {
-                    const corpoStr = typeof corpo === 'object' ? JSON.stringify(corpo) : String(corpo);
-                    cmd += ` -d '${corpoStr.replace(/'/g, "'\\''")}'`;
-                    if (!cabecalhos || !cabecalhos['Content-Type']) cmd += ` -H "Content-Type: application/json"`;
-                }
-                cmd += ` "${url}"`;
-                const output = execSync(cmd, { encoding: 'utf-8' });
-                const parts = output.split('\n__STATUS__');
-                const status = parseInt(parts[1]) || 0;
-                const corpoResposta = parts[0].trim();
-                let dados = corpoResposta;
-                try { dados = JSON.parse(corpoResposta); } catch {}
-                return { status, corpo: dados, texto: corpoResposta, ok: status >= 200 && status < 300 };
+                return urlObj;
             } catch (e) {
-                throw new Error(`❌ Erro HTTP: ${e.message}`);
+                if (e.message.includes('Protocolo')) throw e;
+                throw new Error(`URL inválida: "${url}" — ${e.message}`);
+            }
+        };
+
+        const request = async (method, url, corpo, cabecalhos) => {
+            validarUrl(url);
+
+            const headers = {};
+            if (cabecalhos && typeof cabecalhos === 'object') {
+                for (const [k, v] of Object.entries(cabecalhos)) headers[k] = v;
+            }
+
+            const options = { method, headers };
+            if (corpo !== undefined && corpo !== null) {
+                options.body = typeof corpo === 'object' ? JSON.stringify(corpo) : String(corpo);
+                if (!headers['Content-Type'] && !headers['content-type']) {
+                    headers['Content-Type'] = 'application/json';
+                }
+            }
+
+            try {
+                const resposta = await fetch(url, options);
+                const texto = await resposta.text();
+                let dados;
+                try { dados = JSON.parse(texto); } catch { dados = texto; }
+                return { status: resposta.status, corpo: dados, texto, ok: resposta.ok };
+            } catch (e) {
+                throw new Error(`Erro HTTP ao ${method} ${url}: ${e.message}`);
             }
         };
 

@@ -63,7 +63,11 @@ if (comando === 'instalar') {
             const evaluator = new Evaluator(fullPath);
             await evaluator.execute(ast);
         } catch (error) {
-            console.error('❌ Erro MambaScript:', error.message);
+            if (error && error._mambaFormatado) {
+                console.error(error.message);
+            } else {
+                console.error('❌ Erro MambaScript:', error.message);
+            }
             process.exit(1);
         }
     })();
