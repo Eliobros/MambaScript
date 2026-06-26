@@ -101,8 +101,8 @@ class Parser {
 
             this.expect('IDENTIFIER');
 
-            // resultado = valor
-            if (this.currentToken && this.currentToken.type === 'ASSIGN') {
+            // resultado = valor | resultado += valor | -= | *= | /=
+            if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
                 this.pos = savedPos;
                 this.currentToken = savedToken;
                 return this.assignmentStatement();
@@ -113,7 +113,7 @@ class Parser {
                 this.advance();
                 this.expect('IDENTIFIER');
 
-                if (this.currentToken && this.currentToken.type === 'ASSIGN') {
+                if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
                     this.pos = savedPos;
                     this.currentToken = savedToken;
                     return this.assignmentStatement();
@@ -131,7 +131,7 @@ class Parser {
                 this.expression(); // consome o índice
                 this.expect('RBRACKET');
 
-                if (this.currentToken && this.currentToken.type === 'ASSIGN') {
+                if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
                     this.pos = savedPos;
                     this.currentToken = savedToken;
                     return this.assignmentStatement();
@@ -328,9 +328,19 @@ switchStatement() {
     // para cada item em lista:
     if (this.currentToken && this.currentToken.type === 'CADA') {
         this.advance(); // pular 'cada'
-        const varName = this.expect('IDENTIFIER').value;
-        this.expect('EM');
-        const iterable = this.comparison();
+
+const varNames = [];
+varNames.push(this.expect('IDENTIFIER').value);
+
+// aceita: nome1, nome2, nome3...
+while (this.currentToken && this.currentToken.type === 'COMMA') {
+    this.advance();
+    varNames.push(this.expect('IDENTIFIER').value);
+}
+
+this.expect('EM');
+
+const iterable = this.comparison();
         this.expect('COLON');
 
         const body = [];
@@ -338,7 +348,12 @@ switchStatement() {
             body.push(this.statement());
         }
         this.expect('END');
-        return { type: 'ForEach', varName, iterable, body };
+        return {
+    type: 'ForEach',
+    varNames,
+    iterable,
+    body
+};
     }
 
     // para i de 1 ate 10: (lógica original)
@@ -385,7 +400,6 @@ switchStatement() {
     const name = this.expect('IDENTIFIER').value;
     let target = { type: 'Identifier', name };
 
-    // Suporta encadeamento de DOT e LBRACKET
     while (this.currentToken && (
         this.currentToken.type === 'DOT' ||
         this.currentToken.type === 'LBRACKET'
@@ -393,25 +407,40 @@ switchStatement() {
         if (this.currentToken.type === 'DOT') {
             this.advance();
             const property = this.expect('IDENTIFIER').value;
-            target = {
-                type: 'PropertyAccess',
-                object: target,
-                property
-            };
+            target = { type: 'PropertyAccess', object: target, property };
         } else if (this.currentToken.type === 'LBRACKET') {
             this.advance();
             const index = this.comparison();
             this.expect('RBRACKET');
-            target = {
-                type: 'IndexAccess',
-                object: target,
-                index
-            };
+            target = { type: 'IndexAccess', object: target, index };
         }
     }
 
-    this.expect('ASSIGN');
-    const value = this.comparison();
+    const assignOps = {
+        'ASSIGN': null,
+        'PLUS_ASSIGN': 'PLUS',
+        'MINUS_ASSIGN': 'MINUS',
+        'MULT_ASSIGN': 'MULT',
+        'DIV_ASSIGN': 'DIV'
+    };
+
+    if (!this.currentToken || !(this.currentToken.type in assignOps)) {
+        throw new Error(
+            `❌ Erro na linha ${this.currentToken ? this.currentToken.line : '?'}: ` +
+            `Esperava operador de atribuição (=, +=, -=, *=, /=)`
+        );
+    }
+
+    const opType = this.currentToken.type;
+    this.advance();
+
+    let value = this.comparison();
+
+    const binOp = assignOps[opType];
+    if (binOp) {
+        value = { type: 'BinaryOp', operator: binOp, left: target, right: value };
+    }
+
     return { type: 'Assignment', name: target, value };
 }
 
@@ -520,6 +549,12 @@ switchStatement() {
             this.advance();
             return { type: 'Null' };
         }
+        
+        if (token.type === 'AWAIT') {
+    this.advance();
+    const expr = this.factor();
+    return { type: 'Await', expression: expr };
+}
 
         // ARRAY LITERAL
         if (token.type === 'LBRACKET') {

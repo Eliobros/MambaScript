@@ -133,6 +133,7 @@ class Lexer {
             'tente': 'TENTE', 
             'capturar': 'CAPTURAR',
              'parar': 'BREAK',
+             'aguardar': 'AWAIT',
              'continuar': 'CONTINUE',
               'escolher': 'SWITCH',
               'caso': 'CASE',
@@ -214,12 +215,52 @@ class Lexer {
                 }
                 continue;
             }
+            
+            if (this.currentChar === '+') {
+    this.advance();
+    if (this.currentChar === '=') {
+        this.advance();
+        tokens.push(new Token('PLUS_ASSIGN', '+=', line, col));
+    } else {
+        tokens.push(new Token('PLUS', '+', line, col));
+    }
+    continue;
+}
+
+if (this.currentChar === '-') {
+    this.advance();
+    if (this.currentChar === '=') {
+        this.advance();
+        tokens.push(new Token('MINUS_ASSIGN', '-=', line, col));
+    } else {
+        tokens.push(new Token('MINUS', '-', line, col));
+    }
+    continue;
+}
+
+if (this.currentChar === '*') {
+    this.advance();
+    if (this.currentChar === '=') {
+        this.advance();
+        tokens.push(new Token('MULT_ASSIGN', '*=', line, col));
+    } else {
+        tokens.push(new Token('MULT', '*', line, col));
+    }
+    continue;
+}
+
+if (this.currentChar === '/') {
+    this.advance();
+    if (this.currentChar === '=') {
+        this.advance();
+        tokens.push(new Token('DIV_ASSIGN', '/=', line, col));
+    } else {
+        tokens.push(new Token('DIV', '/', line, col));
+    }
+    continue;
+}
 
             const symbols = {
-                '+': 'PLUS',
-                '-': 'MINUS',
-                '*': 'MULT',
-                '/': 'DIV',
                 '(': 'LPAREN',
                 ')': 'RPAREN',
                 '[': 'LBRACKET',
