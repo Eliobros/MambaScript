@@ -116,38 +116,46 @@ class Parser {
 
             // obj.prop = valor
             if (this.currentToken && this.currentToken.type === 'DOT') {
-                this.advance();
-                this.expect('IDENTIFIER');
+    this.advance();
+    this.expect('IDENTIFIER');
 
-                if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
-                    this.pos = savedPos;
-                    this.currentToken = this.tokens[this.pos];
-                    return this.assignmentStatement(loc);
-                }
+    if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
+        this.pos = savedPos;
+        this.currentToken = this.tokens[this.pos];
+        return this.assignmentStatement(loc);
+    }
 
-                const exprDot = this.expression();
-                exprDot.line = loc.line;
-                exprDot.column = loc.column;
-                return { type: 'ExpressionStatement', expression: exprDot, line: loc.line, column: loc.column };
-            }
+    // 🔧 FIX: rebobina e deixa expression()/factor() parsear a chamada completa
+    this.pos = savedPos;
+    this.currentToken = this.tokens[this.pos];
+
+    const exprDot = this.expression();
+    exprDot.line = loc.line;
+    exprDot.column = loc.column;
+    return { type: 'ExpressionStatement', expression: exprDot, line: loc.line, column: loc.column };
+}
 
             // resultado[chave] = valor
             if (this.currentToken && this.currentToken.type === 'LBRACKET') {
-                this.advance();
-                this.expression(); // consome o índice
-                this.expect('RBRACKET');
+    this.advance();
+    this.comparison(); // consome o índice (troquei expression() por comparison() por segurança, mas não é o foco)
+    this.expect('RBRACKET');
 
-                if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
-                    this.pos = savedPos;
-                    this.currentToken = this.tokens[this.pos];
-                    return this.assignmentStatement(loc);
-                }
+    if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
+        this.pos = savedPos;
+        this.currentToken = this.tokens[this.pos];
+        return this.assignmentStatement(loc);
+    }
 
-                const exprIdx = this.expression();
-                exprIdx.line = loc.line;
-                exprIdx.column = loc.column;
-                return { type: 'ExpressionStatement', expression: exprIdx, line: loc.line, column: loc.column };
-            }
+    // 🔧 FIX: rebobina e deixa expression()/factor() parsear tudo desde o início
+    this.pos = savedPos;
+    this.currentToken = this.tokens[this.pos];
+
+    const exprIdx = this.expression();
+    exprIdx.line = loc.line;
+    exprIdx.column = loc.column;
+    return { type: 'ExpressionStatement', expression: exprIdx, line: loc.line, column: loc.column };
+}
 
             // Chamada de função ou expressão standalone
             const exprStmt = this.expression();
