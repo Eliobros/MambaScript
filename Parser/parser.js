@@ -106,7 +106,7 @@ class Parser {
             const savedPos = this.pos;
             this.expect('IDENTIFIER');
 
-            // resultado = valor | resultado += valor | -= | *= | /=
+            // Alvo de atribuição simples: a = valor | a += valor | -= | *= | /=
             if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
                 // Rebobina para que assignmentStatement consuma o IDENTIFIER de novo
                 this.pos = savedPos;
@@ -114,50 +114,22 @@ class Parser {
                 return this.assignmentStatement(loc);
             }
 
-            // obj.prop = valor
-            if (this.currentToken && this.currentToken.type === 'DOT') {
-    this.advance();
-    this.expect('IDENTIFIER');
-
-    if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
-        this.pos = savedPos;
-        this.currentToken = this.tokens[this.pos];
-        return this.assignmentStatement(loc);
-    }
-
-    // 🔧 FIX: rebobina e deixa expression()/factor() parsear a chamada completa
-    this.pos = savedPos;
-    this.currentToken = this.tokens[this.pos];
-
-    const exprDot = this.expression();
-    exprDot.line = loc.line;
-    exprDot.column = loc.column;
-    return { type: 'ExpressionStatement', expression: exprDot, line: loc.line, column: loc.column };
-}
-
-            // resultado[chave] = valor
-            if (this.currentToken && this.currentToken.type === 'LBRACKET') {
-    this.advance();
-    this.comparison(); // consome o índice (troquei expression() por comparison() por segurança, mas não é o foco)
-    this.expect('RBRACKET');
-
-    if (this.currentToken && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.currentToken.type)) {
-        this.pos = savedPos;
-        this.currentToken = this.tokens[this.pos];
-        return this.assignmentStatement(loc);
-    }
-
-    // 🔧 FIX: rebobina e deixa expression()/factor() parsear tudo desde o início
-    this.pos = savedPos;
-    this.currentToken = this.tokens[this.pos];
-
-    const exprIdx = this.expression();
-    exprIdx.line = loc.line;
-    exprIdx.column = loc.column;
-    return { type: 'ExpressionStatement', expression: exprIdx, line: loc.line, column: loc.column };
-}
+            // Alvo com cadeia (.prop e/ou [chave]) terminando em atribuição:
+            // obj.prop = v | obj[chave] = v | obj.prop[chave] = v | obj[chave].prop = v
+            if (
+                this.currentToken &&
+                ['DOT', 'LBRACKET'].includes(this.currentToken.type) &&
+                this._chainEndsWithAssignment()
+            ) {
+                this.pos = savedPos;
+                this.currentToken = this.tokens[this.pos];
+                return this.assignmentStatement(loc);
+            }
 
             // Chamada de função ou expressão standalone
+            this.pos = savedPos;
+            this.currentToken = this.tokens[this.pos];
+
             const exprStmt = this.expression();
             exprStmt.line = loc.line;
             exprStmt.column = loc.column;
@@ -420,6 +392,33 @@ const iterable = this.comparison();
     return { type: 'Import', name, source, line: loc.line, column: loc.column };
 }
 
+    // Verifica SEM consumir tokens se, a partir da posição atual, há uma cadeia
+    // de .prop / [chave] (em qualquer ordem) que termina em operador de atribuição.
+    _chainEndsWithAssignment() {
+        const assignOps = ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'];
+        let i = this.pos;
+        const tokens = this.tokens;
+
+        while (tokens[i] && (tokens[i].type === 'DOT' || tokens[i].type === 'LBRACKET')) {
+            if (tokens[i].type === 'DOT') {
+                i++;
+                if (!tokens[i] || tokens[i].type !== 'IDENTIFIER') return false;
+                i++;
+            } else {
+                i++;
+                let depth = 1;
+                while (tokens[i] && depth > 0) {
+                    if (tokens[i].type === 'LBRACKET') depth++;
+                    else if (tokens[i].type === 'RBRACKET') depth--;
+                    i++;
+                }
+                if (depth > 0) return false; // colchete não fechado
+            }
+        }
+
+        return !!tokens[i] && assignOps.includes(tokens[i].type);
+    }
+
     assignmentStatement(locHint = null) {
     const loc = locHint || this.loc();
     const name = this.expect('IDENTIFIER').value;
@@ -634,6 +633,7 @@ const iterable = this.comparison();
             let result = { type: 'Identifier', name: token.value, line: token.line, column: token.column };
             this.advance();
 
+            // Chamada de função: nome(args)
             if (this.currentToken && this.currentToken.type === 'LPAREN') {
                 this.advance();
                 const args = [];
@@ -649,45 +649,46 @@ const iterable = this.comparison();
                 result = { type: 'FunctionCall', name: result.name, args, line: token.line, column: token.column };
             }
 
-            if (this.currentToken && this.currentToken.type === 'LBRACKET') {
-                this.advance();
-                const index = this.comparison();
-                this.expect('RBRACKET');
-                result = { type: 'ArrayAccess', array: result, index, line: token.line, column: token.column };
-            }
-
-            while (this.currentToken && this.currentToken.type === 'DOT') {
-                this.advance();
-                const propertyOrMethod = this.expect('IDENTIFIER').value;
-
-                if (this.currentToken && this.currentToken.type === 'LPAREN') {
+            // Cadeia pós-fixa em qualquer ordem: .prop, [chave], .metodo(args)
+            while (this.currentToken && (this.currentToken.type === 'DOT' || this.currentToken.type === 'LBRACKET')) {
+                if (this.currentToken.type === 'LBRACKET') {
                     this.advance();
-                    const args = [];
-
-                    while (this.currentToken.type !== 'RPAREN') {
-                        args.push(this.comparison());
-                        if (this.currentToken.type === 'COMMA') {
-                            this.advance();
-                        }
-                    }
-                    this.expect('RPAREN');
-
-                    result = {
-                        type: 'MethodCall',
-                        object: result,
-                        method: propertyOrMethod,
-                        args,
-                        line: token.line,
-                        column: token.column
-                    };
+                    const index = this.comparison();
+                    this.expect('RBRACKET');
+                    result = { type: 'ArrayAccess', array: result, index, line: token.line, column: token.column };
                 } else {
-                    result = {
-                        type: 'PropertyAccess',
-                        object: result,
-                        property: propertyOrMethod,
-                        line: token.line,
-                        column: token.column
-                    };
+                    this.advance();
+                    const propertyOrMethod = this.expect('IDENTIFIER').value;
+
+                    if (this.currentToken && this.currentToken.type === 'LPAREN') {
+                        this.advance();
+                        const args = [];
+
+                        while (this.currentToken.type !== 'RPAREN') {
+                            args.push(this.comparison());
+                            if (this.currentToken.type === 'COMMA') {
+                                this.advance();
+                            }
+                        }
+                        this.expect('RPAREN');
+
+                        result = {
+                            type: 'MethodCall',
+                            object: result,
+                            method: propertyOrMethod,
+                            args,
+                            line: token.line,
+                            column: token.column
+                        };
+                    } else {
+                        result = {
+                            type: 'PropertyAccess',
+                            object: result,
+                            property: propertyOrMethod,
+                            line: token.line,
+                            column: token.column
+                        };
+                    }
                 }
             }
 
