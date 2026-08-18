@@ -8,9 +8,15 @@ const Parser    = require('./Parser/parser');
 const Evaluator = require('./Evaluator/evaluate');
 const { instalar, remover, listar, procurar, ajuda, whoami } = require('./Instalador/instalador');
 const { publicar, salvarToken } = require('./Instalador/publicador');
+const { atualizar, verificarAtualizacao } = require('./Instalador/atualizador');
 
 const args = process.argv.slice(2);
 const comando = args[0];
+
+// Verificação automática de atualização (não bloqueia e é feita no máximo 1x por dia)
+if (comando !== 'atualizar' && comando !== 'update' && comando !== 'upgrade') {
+    verificarAtualizacao();
+}
 
 if (comando === 'instalar') {
     instalar(args[1]);
@@ -32,6 +38,8 @@ if (comando === 'instalar') {
     ajuda();
 } else if (comando === 'whoami') {
     whoami();
+} else if (comando === 'atualizar' || comando === 'update' || comando === 'upgrade') {
+    atualizar();
 } else if (comando === '--versao' || comando === '-v') {
     const pkg = require('./package.json');
     console.log(`MambaScript v${pkg.version}`);

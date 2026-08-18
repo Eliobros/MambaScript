@@ -8,7 +8,8 @@
   },
   "scripts": {
     "test": "node mambas exemplos/ola.ms",
-    "build": "pkg mambas --out-path dist --targets node18-linux-x64,node18-macos-x64,node18-win-x64"
+    "build": "pkg mambas --out-path dist --targets node18-linux-x64,node18-macos-x64,node18-win-x64",
+    "build-studio": "npx esbuild mamba-core.js --bundle --minify --platform=neutral --alias:fs=./fs-mock.js --outfile=mamba-bundle.js"
   },
   "keywords": [
     "mambascript",
@@ -51,7 +52,8 @@
       "Parser/parser.js",
       "Evaluator/evaluate.js",
       "Instalador/instalador.js",
-      "Instalador/publicador.js"
+      "Instalador/publicador.js",
+      "Instalador/atualizador.js"
     ],
     "assets": [
       "node_modules/prompt-sync/**/*"
@@ -61,5 +63,8 @@
       "node18-linux-x64",
       "node18-macos-x64"
     ]
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
   }
 }

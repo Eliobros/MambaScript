@@ -304,6 +304,7 @@ Uso:
   mambas listar                  → Lista pacotes instalados
   mambas procurar [termo]        → Busca pacotes no registry
   mambas whoami                  → Mostra usuário logado
+  mambas atualizar (ou update)   → Verifica e instala a versão mais recente
   mambas ajuda                   → Mostra esta ajuda
 
 Registry atual: ${REGISTRY_URL}
