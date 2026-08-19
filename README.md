@@ -31,10 +31,11 @@ MambaScript é uma linguagem de programação criada em Moçambique, com sintaxe
 16. [Funções Built-in](#-funções-built-in)
 17. [Servidor HTTP](#-servidor-http)
 18. [Base de Dados MySQL](#-base-de-dados-mysql)
-19. [Sistema de Pacotes](#-sistema-de-pacotes)
-20. [Exemplos Completos](#-exemplos-completos)
-21. [Contribuição](#-contribuição)
-22. [Licença](#-licença)
+19. [Base de Dados PostgreSQL](#-base-de-dados-postgresql)
+20. [Sistema de Pacotes](#-sistema-de-pacotes)
+21. [Exemplos Completos](#-exemplos-completos)
+22. [Contribuição](#-contribuição)
+23. [Licença](#-licença)
 
 ---
 
@@ -596,6 +597,7 @@ importar fs de "fs"
 importar caminho de "caminho"
 importar http de "http"
 importar bd de "mysql"
+importar bdpg de "psql"
 importar sistema de "sistema"
 ```
 
@@ -856,6 +858,63 @@ escreva "ID inserido: " + resultado.inseridoId
 
 bd.executar("UPDATE usuarios SET nome = ? WHERE id = ?", ["Elio", 1])
 bd.executar("DELETE FROM usuarios WHERE id = ?", [1])
+
+bd.fechar()
+```
+
+---
+
+## 🗄️ Base de Dados PostgreSQL
+
+### Pré-requisito
+
+```bash
+npm install pg
+```
+
+### Funções do Módulo `psql`
+
+| Função | Descrição |
+|--------|-----------|
+| `conectar(stringDeConexao)` | Conecta usando uma string direta |
+| `conectar(host, usuario, senha, base, porta?)` | Conecta com parâmetros separados (porta padrão: 5432) |
+| `consultar(sql, parametros?)` | Executa SELECT, retorna array de linhas |
+| `executar(sql, parametros?)` | Executa INSERT/UPDATE/DELETE |
+| `fechar()` | Fecha a conexão |
+
+> ⚠️ Os placeholders usam a sintaxe nativa do PostgreSQL: `$1`, `$2`, ...
+
+O método `executar` retorna:
+
+| Propriedade | Descrição |
+|-------------|-----------|
+| `afetadas` | Número de linhas afetadas |
+| `linhas` | Linhas retornadas (ex.: com `RETURNING id`) |
+| `ok` | `verdadeiro` se afetou alguma linha |
+
+```ms
+importar bd de "psql"
+
+# Conexão com string direta
+bd.conectar("postgres://usuario:senha@localhost:5432/minha_base")
+
+# Ou com parâmetros separados (como o MySQL)
+# bd.conectar("localhost", "usuario", "senha", "minha_base")
+
+variavel usuarios = bd.consultar("SELECT * FROM usuarios")
+escreva usuarios
+
+variavel user = bd.consultar("SELECT * FROM usuarios WHERE id = $1", [1])
+escreva user
+
+variavel resultado = bd.executar(
+    "INSERT INTO usuarios (nome, email) VALUES ($1, $2) RETURNING id",
+    ["Habibo", "habibo@exemplo.com"]
+)
+escreva "ID inserido: " + resultado.linhas[0].id
+
+bd.executar("UPDATE usuarios SET nome = $1 WHERE id = $2", ["Elio", 1])
+bd.executar("DELETE FROM usuarios WHERE id = $1", [1])
 
 bd.fechar()
 ```
