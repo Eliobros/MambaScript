@@ -126,6 +126,8 @@ class Evaluator {
         this.globalEnv = new Environment(null, true);
         this.env = this.globalEnv;
         this.functions = {};
+        this.classes = {};
+        this.exports = null;
         
         this.builtinFunctions = {
             'hoje': this.createDateObject.bind(this),
@@ -216,7 +218,9 @@ class Evaluator {
     async _callUserFunction(func, args) {
         const callEnv = new Environment(func.closure || this.globalEnv);
         const evaluatedArgs = [];
-        for (const arg of args) evaluatedArgs.push(await this.evaluate(arg));
+        for (const arg of args) {
+            evaluatedArgs.push(arg && arg.type ? await this.evaluate(arg) : arg);
+        }
         for (let i = 0; i < func.params.length; i++) {
             callEnv.define(func.params[i], evaluatedArgs[i]);
         }
@@ -270,6 +274,10 @@ class Evaluator {
         const obj = await this.evaluate(node.name.object);
         obj[node.name.property] = valor;
         return;
+    }
+
+    if (node.name.type === 'This') {
+        throw new Error('Atribuição direta a "isto" não é permitida');
     }
 
     if (node.name.type === 'Identifier') {
@@ -410,6 +418,24 @@ case 'Switch':
     }
     break;
 
+            case 'ClassDeclaration': {
+                this.classes[node.name] = {
+                    _type: 'MambaClass',
+                    name: node.name,
+                    methods: Object.fromEntries(node.methods.map(method => [method.name, {
+                        _type: 'MambaMethod',
+                        params: method.params,
+                        body: method.body
+                    }])),
+                    closure: this.env
+                };
+                break;
+            }
+
+            case 'Export':
+                this.exports = node.names;
+                break;
+
             case 'FunctionDeclaration':
                 // closure: snapshot do escopo onde a função foi DECLARADA
                 // (permite que futuras chamadas vejam as variáveis capturadas)
@@ -478,6 +504,9 @@ case 'Switch':
 
         try {
             switch (node.type) {
+            case 'LiteralValue':
+                return node.value;
+
             case 'Number':
                 return node.value;
 
@@ -598,6 +627,33 @@ case 'Switch':
                 
               
 
+            case 'This':
+                if (!this.env.has('isto')) throw new Error('"isto" só pode ser usado dentro de um método de classe');
+                return this.env.get('isto');
+
+            case 'NewExpression': {
+                const classe = this.classes[node.className] || (() => {
+                    try {
+                        const valor = this.env.get(node.className);
+                        return valor && valor._type === 'MambaClassConstructor' ? valor.classe : null;
+                    } catch { return null; }
+                })();
+                if (!classe) throw new Error(`Classe não definida: ${node.className}`);
+                const instancia = { _type: 'MambaInstance', _class: classe };
+        for (const [nome, metodo] of Object.entries(classe.methods)) {
+            instancia[nome] = (...args) => evaluator._callMethodFunction(metodo, instancia, args);
+        }
+                const inicializar = classe.methods.inicializar;
+                if (inicializar) {
+                    const args = [];
+                    for (const arg of node.args) args.push(await this.evaluate(arg));
+                    await this._callMethodFunction(inicializar, instancia, args);
+                } else if (node.args.length) {
+                    throw new Error(`A classe "${node.className}" não possui inicializar()`);
+                }
+                return instancia;
+            }
+
             case 'FunctionCall':
                 if (node.name in this.builtinFunctions) {
                     const args = [];
@@ -627,6 +683,9 @@ case 'Switch':
 
             case 'MethodCall':
                 const obj = await this.evaluate(node.object);
+                if (obj && obj._type === 'MambaInstance' && obj._class.methods[node.method]) {
+                    return await this._callMethodFunction(obj._class.methods[node.method], obj, node.args);
+                }
                 return await this.callMethod(obj, node.method, node.args);
 
             default:
@@ -635,6 +694,27 @@ case 'Switch':
         } catch (e) {
             if (e && e._mambaFormatado) throw e;
             throw this._formatarComContexto(node, e);
+        }
+    }
+
+    async _callMethodFunction(method, instancia, args) {
+        const callEnv = new Environment(method.closure || (instancia._class && instancia._class.closure) || this.globalEnv);
+        callEnv.define('isto', instancia);
+        const evaluatedArgs = [];
+        for (const arg of args) {
+            evaluatedArgs.push(arg && arg.type ? await this.evaluate(arg) : arg);
+        }
+        for (let i = 0; i < method.params.length; i++) callEnv.define(method.params[i], evaluatedArgs[i]);
+        const prevEnv = this.env;
+        try {
+            this.env = callEnv;
+            for (const stmt of method.body) {
+                await this.executeStatement(stmt);
+                if (this.env.hasReturned) break;
+            }
+            return this.env.returnValue;
+        } finally {
+            this.env = prevEnv;
         }
     }
 
@@ -741,7 +821,9 @@ if (methodName === 'substring') {
 
         const method = obj[methodName];
         const evaluatedArgs = [];
-        for (const arg of args) evaluatedArgs.push(await this.evaluate(arg));
+        for (const arg of args) {
+            evaluatedArgs.push(arg && arg.type ? await this.evaluate(arg) : arg);
+        }
         return await method.call(obj, ...evaluatedArgs);
     }
     
@@ -806,7 +888,13 @@ if (methodName === 'substring') {
         await moduleEvaluator.execute(ast);
 
         const moduleExports = {};
+        const nomesExportados = moduleEvaluator.exports;
+        const incluir = (nome, valor) => {
+            if (valor !== undefined) moduleExports[nome] = valor;
+        };
+        const exportarTudo = nomesExportados === null;
         for (const [key] of Object.entries(moduleEvaluator.functions)) {
+            if (!exportarTudo && !nomesExportados.includes(key)) continue;
             const funcRef = moduleEvaluator.functions[key];
             moduleExports[key] = async (...args) => {
                 const callEnv = new Environment(funcRef.closure || moduleEvaluator.globalEnv);
@@ -829,10 +917,37 @@ if (methodName === 'substring') {
             };
         }
         for (const [key, value] of Object.entries(moduleEvaluator.globalEnv.vars)) {
-            moduleExports[key] = value;
+            if (exportarTudo || nomesExportados.includes(key)) incluir(key, value);
+        }
+        for (const [key, value] of Object.entries(moduleEvaluator.classes)) {
+            if (!exportarTudo || nomesExportados.includes(key)) {
+                incluir(key, this._criarConstrutorClasse(value));
+            }
+        }
+        if (nomesExportados) {
+            for (const nome of nomesExportados) {
+                if (!(nome in moduleExports)) throw new Error(`❌ "${nome}" não existe no módulo "${source}"`);
+            }
         }
 
         this.env.define(name, moduleExports);
+    }
+
+    _criarConstrutorClasse(classe) {
+        const evaluator = this;
+        return {
+            _type: 'MambaClassConstructor',
+            classe,
+            criar: async (...args) => {
+                const instancia = { _type: 'MambaInstance', _class: classe };
+        for (const [nome, metodo] of Object.entries(classe.methods)) {
+            instancia[nome] = (...args) => evaluator._callMethodFunction(metodo, instancia, args);
+        }
+                const inicializar = classe.methods.inicializar;
+                if (inicializar) await evaluator._callMethodFunction(inicializar, instancia, args.map(valor => ({ type: 'LiteralValue', value: valor })));
+                return instancia;
+            }
+        };
     }
     
     

@@ -47,6 +47,10 @@ class Parser {
             'ELSE': '"senao"',
             'WHILE': '"enquanto"',
             'FUNCTION': '"funcao"',
+            'CLASS': '"classe"',
+            'NEW': '"novo"',
+            'EXPORT': '"exportar"',
+            'THIS': '"isto"',
             'PRINT': '"escreva"',
             'VAR': '"variavel"',
             'RETURN': '"retorna"',
@@ -88,6 +92,10 @@ class Parser {
             return this.forStatement();
         case 'FUNCTION':
             return this.functionDeclaration();
+        case 'CLASS':
+            return this.classDeclaration();
+        case 'EXPORT':
+            return this.exportStatement();
         case 'RETURN':
             return this.returnStatement();
         case 'IMPORT':
@@ -100,6 +108,26 @@ class Parser {
             return this.switchStatement();
         case 'TENTE':
             return this.tryCatchStatement();
+
+        case 'THIS': {
+            const loc = this.loc();
+            const savedPos = this.pos;
+            this.advance();
+            if (this.currentToken && this.currentToken.type === 'DOT') {
+                let i = this.pos + 1;
+                if (this.tokens[i] && this.tokens[i].type === 'IDENTIFIER') i++;
+                if (this.tokens[i] && ['ASSIGN', 'PLUS_ASSIGN', 'MINUS_ASSIGN', 'MULT_ASSIGN', 'DIV_ASSIGN'].includes(this.tokens[i].type)) {
+                    this.pos = savedPos;
+                    this.currentToken = this.tokens[this.pos];
+                    return this.assignmentStatement(loc);
+                }
+                this.pos = savedPos;
+                this.currentToken = this.tokens[this.pos];
+                const exprStmt = this.expression();
+                return { type: 'ExpressionStatement', expression: exprStmt, line: loc.line, column: loc.column };
+            }
+            throw new Error(`❌ "isto" deve ser usado com uma propriedade ou método.`);
+        }
 
         case 'IDENTIFIER': {
             const loc = this.loc();
@@ -279,7 +307,33 @@ class Parser {
         return { type: 'While', condition, body, line: loc.line, column: loc.column };
     }
 
-    functionDeclaration() {
+    classDeclaration() {
+        const loc = this.loc();
+        this.expect('CLASS');
+        const name = this.expect('IDENTIFIER').value;
+        this.expect('COLON');
+        const methods = [];
+        while (this.currentToken && this.currentToken.type !== 'END' && this.currentToken.type !== 'EOF') {
+            methods.push(this.functionDeclaration(true));
+        }
+        this.expect('END');
+        return { type: 'ClassDeclaration', name, methods, line: loc.line, column: loc.column };
+    }
+
+    exportStatement() {
+        const loc = this.loc();
+        this.expect('EXPORT');
+        this.expect('LBRACE');
+        const names = [];
+        while (this.currentToken && this.currentToken.type !== 'RBRACE') {
+            names.push(this.expect('IDENTIFIER').value);
+            if (this.currentToken.type === 'COMMA') this.advance();
+        }
+        this.expect('RBRACE');
+        return { type: 'Export', names, line: loc.line, column: loc.column };
+    }
+
+    functionDeclaration(isMethod = false) {
         const loc = this.loc();
         this.advance();
         const name = this.expect('IDENTIFIER').value;
@@ -421,16 +475,22 @@ const iterable = this.comparison();
 
     assignmentStatement(locHint = null) {
     const loc = locHint || this.loc();
-    const name = this.expect('IDENTIFIER').value;
-    let target = { type: 'Identifier', name, line: this.currentToken.line, column: this.currentToken.column };
+    let target;
+    if (this.currentToken.type === 'THIS') {
+        const token = this.currentToken;
+        this.advance();
+        target = { type: 'This', line: token.line, column: token.column };
+    } else {
+        const name = this.expect('IDENTIFIER').value;
+        target = { type: 'Identifier', name, line: this.currentToken.line, column: this.currentToken.column };
+    }
 
     while (this.currentToken && (
         this.currentToken.type === 'DOT' ||
         this.currentToken.type === 'LBRACKET'
-    )) {
-        if (this.currentToken.type === 'DOT') {
-            this.advance();
-            const property = this.expect('IDENTIFIER').value;
+    )) {            if (this.currentToken.type === 'DOT') {
+                this.advance();
+                const property = this.expect('IDENTIFIER').value;
             target = { type: 'PropertyAccess', object: target, property, line: loc.line, column: loc.column };
         } else if (this.currentToken.type === 'LBRACKET') {
             this.advance();
@@ -628,6 +688,58 @@ const iterable = this.comparison();
             };
         }
 
+
+        if (token.type === 'THIS') {
+            let result = { type: 'This', line: token.line, column: token.column };
+            this.advance();
+            while (this.currentToken && this.currentToken.type === 'DOT') {
+                this.advance();
+                const property = this.expect('IDENTIFIER').value;
+                if (this.currentToken && this.currentToken.type === 'LPAREN') {
+                    this.advance();
+                    const args = [];
+                    while (this.currentToken.type !== 'RPAREN') {
+                        args.push(this.comparison());
+                        if (this.currentToken.type === 'COMMA') this.advance();
+                    }
+                    this.expect('RPAREN');
+                    result = { type: 'MethodCall', object: result, method: property, args, line: token.line, column: token.column };
+                } else {
+                    result = { type: 'PropertyAccess', object: result, property, line: token.line, column: token.column };
+                }
+            }
+            return result;
+        }
+
+        if (token.type === 'NEW') {
+            this.advance();
+            const className = this.expect('IDENTIFIER').value;
+            this.expect('LPAREN');
+            const args = [];
+            while (this.currentToken.type !== 'RPAREN') {
+                args.push(this.comparison());
+                if (this.currentToken.type === 'COMMA') this.advance();
+            }
+            this.expect('RPAREN');
+            let result = { type: 'NewExpression', className, args, line: token.line, column: token.column };
+            while (this.currentToken && this.currentToken.type === 'DOT') {
+                this.advance();
+                const property = this.expect('IDENTIFIER').value;
+                if (this.currentToken && this.currentToken.type === 'LPAREN') {
+                    this.advance();
+                    const methodArgs = [];
+                    while (this.currentToken.type !== 'RPAREN') {
+                        methodArgs.push(this.comparison());
+                        if (this.currentToken.type === 'COMMA') this.advance();
+                    }
+                    this.expect('RPAREN');
+                    result = { type: 'MethodCall', object: result, method: property, args: methodArgs, line: token.line, column: token.column };
+                } else {
+                    result = { type: 'PropertyAccess', object: result, property, line: token.line, column: token.column };
+                }
+            }
+            return result;
+        }
 
         if (token.type === 'IDENTIFIER') {
             let result = { type: 'Identifier', name: token.value, line: token.line, column: token.column };
