@@ -668,10 +668,17 @@ case 'Switch':
                     return await this._callUserFunction(this.functions[node.name], node.args);
                 }
                 // Variável pode conter uma função anônima (FunctionLiteral) — closure
+                // Ou uma função nativa JS de módulo importado
                 try {
                     const val = this.env.get(node.name);
                     if (val && val._type === 'MambaFunction') {
                         return await this._callUserFunction(val, node.args);
+                    }
+                    // Funções importadas de módulos são funções JS nativas
+                    if (val && typeof val === 'function') {
+                        const args = [];
+                        for (const arg of node.args) args.push(await this.evaluate(arg));
+                        return await val(...args);
                     }
                 } catch (e) { /* não é uma função aninhada */ }
                 throw new Error(`Função não definida: ${node.name}`);

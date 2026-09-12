@@ -67,11 +67,20 @@ class Lexer {
         this.advance(); // Pula a aspas de abertura
 
         while (this.currentChar && this.currentChar !== quoteType) {
-            // Suporte a escape de aspas
-            if (this.currentChar === '\\' && this.peek() === quoteType) {
+            // Suporte a escape sequences
+            if (this.currentChar === '\\') {
                 this.advance(); // Pula a barra
-                str += this.currentChar;
+                const escapeChar = this.currentChar;
                 this.advance();
+                switch (escapeChar) {
+                    case 'n': str += '\n'; break;
+                    case 't': str += '\t'; break;
+                    case 'r': str += '\r'; break;
+                    case '\\': str += '\\'; break;
+                    case '"': str += '"'; break;
+                    case "'": str += "'"; break;
+                    default: str += escapeChar; break;
+                }
             } else {
                 str += this.currentChar;
                 this.advance();
