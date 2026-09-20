@@ -8,7 +8,7 @@ const tar = require('tar');
 const os = require('os');
 
 // ======================== CONFIGURAÇÕES ========================
-const REGISTRY_URL = process.env.MAMBAS_REGISTRY || 'https://habibo-mambascript-registry.mozhost.shop';
+const REGISTRY_URL = process.env.MAMBAS_REGISTRY || 'https://mambascript-registry.mozhost.shop';
 
 const MODULOS_DIR = path.join(process.cwd(), 'modulos_mambas');
 const REGISTRO_PATH = path.join(MODULOS_DIR, '.registro.json');
