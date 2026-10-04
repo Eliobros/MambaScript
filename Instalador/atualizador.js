@@ -145,7 +145,8 @@ function atualizarViaNpm() {
     console.log('\n📦 Atualizando via npm (pode demorar um pouco)...\n');
 
     const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-    const res = spawnSync(npm, ['install', '-g', 'mambascript-mz@latest'], { stdio: 'inherit' });
+    // Adicionei --force para sobrescrever o arquivo conflitante
+    const res = spawnSync(npm, ['install', '-g', 'mambascript-mz@latest', '--force'], { stdio: 'inherit' });
 
     if (res.status === 0) {
         console.log('\n✅ MambaScript atualizado com sucesso!');
@@ -153,7 +154,7 @@ function atualizarViaNpm() {
     }
 
     console.error('\n❌ Falha ao atualizar via npm.');
-    console.error('💡 Tente manualmente: npm install -g mambascript-mz@latest');
+    console.error('💡 Tente manualmente: npm install -g mambascript-mz@latest --force');
     process.exit(1);
 }
 
