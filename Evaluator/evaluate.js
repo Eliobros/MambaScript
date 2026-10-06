@@ -135,6 +135,7 @@ class Evaluator {
             'json_ler': this.jsonLer.bind(this),
             
             'json_texto': this.jsonTexto.bind(this),
+            'texto_json': this.jsonParaTexto.bind(this),
             'json_escrever': this.jsonEscrever.bind(this),
             'vermelho': (texto) => `\x1b[31m${texto}\x1b[0m`,
             'verde': (texto) => `\x1b[32m${texto}\x1b[0m`,
@@ -1008,6 +1009,10 @@ if (methodName === 'substring') {
     jsonTexto(textoJson) {
         try { return JSON.parse(textoJson); }
         catch (e) { throw new Error(`❌ Erro ao parsear JSON: ${e.message}`); }
+    }
+
+    jsonParaTexto(valor) {
+        return JSON.stringify(valor);
     }
 
     jsonEscrever(arquivo, dados) {
