@@ -76,41 +76,72 @@ function createHttpModule(evaluator) {
                         let corpoRequisicao = '';
                         req.on('data', chunk => { corpoRequisicao += chunk; });
                         req.on('end', async () => {
-                            let corpoParseado = corpoRequisicao;
-                            try { corpoParseado = JSON.parse(corpoRequisicao); } catch {}
+                            try {
+                                let corpoParseado = corpoRequisicao;
+                                try { corpoParseado = JSON.parse(corpoRequisicao); } catch {}
 
-                            const urlObj = new URL(req.url, `http://localhost:${porta}`);
-                            const params = {};
-                            urlObj.searchParams.forEach((val, chave) => { params[chave] = val; });
+                                // Normaliza "//" ou "///x" para "/" ou "/x"
+                                const caminhoBruto = (req.url || '/').replace(/^\/{2,}/, '/');
 
-                            const requisicaoMamba = {
-                                url: urlObj.pathname,
-                                metodo: req.method,
-                                corpo: corpoParseado,
-                                params: params,
-                                cabecalhos: req.headers
-                            };
+                                let urlObj;
+                                try {
+                                    urlObj = new URL(caminhoBruto, `http://localhost:${porta}`);
+                                } catch (e) {
+                                    res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                                    res.end('Bad Request');
+                                    return;
+                                }
 
-                            const respostaMamba = {
-                                enviar: (status, conteudo) => {
-                                    const tipo = typeof conteudo === 'object' ? 'application/json' : 'text/plain; charset=utf-8';
-                                    const saida = typeof conteudo === 'object' ? JSON.stringify(conteudo) : String(conteudo);
-                                    res.writeHead(status, { 'Content-Type': tipo });
-                                    res.end(saida);
-                                },
-                                json: (status, conteudo) => {
-                                    res.writeHead(status, { 'Content-Type': 'application/json' });
-                                    res.end(JSON.stringify(conteudo));
-                                },
-                                cabecalho: (chave, valor) => { res.setHeader(chave, valor); },
-                                redirecionar: (url) => { res.writeHead(302, { 'Location': url }); res.end(); }
-                            };
+                                const params = {};
+                                urlObj.searchParams.forEach((val, chave) => { params[chave] = val; });
 
-                            if (this.callbackMamba && this.callbackMamba._type === 'MambaFunction') {
-                                await evaluator.chamarFuncaoMamba(this.callbackMamba, [requisicaoMamba, respostaMamba]);
+                                const requisicaoMamba = {
+                                    url: urlObj.pathname,
+                                    metodo: req.method,
+                                    corpo: corpoParseado,
+                                    params: params,
+                                    cabecalhos: req.headers
+                                };
+
+                                const respostaMamba = {
+                                    enviar: (status, conteudo) => {
+                                        const tipo = typeof conteudo === 'object' ? 'application/json' : 'text/plain; charset=utf-8';
+                                        const saida = typeof conteudo === 'object' ? JSON.stringify(conteudo) : String(conteudo);
+                                        res.writeHead(status, { 'Content-Type': tipo });
+                                        res.end(saida);
+                                    },
+                                    json: (status, conteudo) => {
+                                        res.writeHead(status, { 'Content-Type': 'application/json' });
+                                        res.end(JSON.stringify(conteudo));
+                                    },
+                                    cabecalho: (chave, valor) => { res.setHeader(chave, valor); },
+                                    redirecionar: (url) => { res.writeHead(302, { 'Location': url }); res.end(); }
+                                };
+
+                                if (this.callbackMamba && this.callbackMamba._type === 'MambaFunction') {
+                                    await evaluator.chamarFuncaoMamba(this.callbackMamba, [requisicaoMamba, respostaMamba]);
+                                }
+                            } catch (e) {
+                                console.error('[HTTP] Erro ao processar pedido:', e.message);
+                                if (!res.headersSent) {
+                                    res.writeHead(500, { 'Content-Type': 'application/json' });
+                                    res.end(JSON.stringify({ erro: 'Erro interno do servidor' }));
+                                } else {
+                                    res.end();
+                                }
                             }
                         });
                     });
+
+                    // Pedidos malformados não derrubam o servidor
+                    servidorNode.on('clientError', (err, socket) => {
+                        if (socket.writable) {
+                            socket.end('HTTP/1.1 400 Bad Request\r\n\r\n');
+                        } else {
+                            socket.destroy();
+                        }
+                    });
+
                     servidorNode.listen(porta);
                 }
             };
