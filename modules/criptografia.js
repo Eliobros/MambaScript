@@ -1,11 +1,32 @@
-// Módulo nativo criptografia — hash de senhas avançado com bcrypt
+// Módulo nativo criptografia — bcrypt + utilitários (base64 e HMAC)
+const crypto = require('crypto');
+
+const utilitarios = {
+    paraBase64: (texto) =>
+        Buffer.from(String(texto), 'utf8').toString('base64'),
+
+    deBase64: (b64) =>
+        Buffer.from(String(b64), 'base64').toString('utf8'),
+
+    hmacSha256: (dados, segredo) => {
+        if (segredo === undefined || segredo === null || segredo === '') {
+            throw new Error("❌ hmacSha256 requer um segredo.");
+        }
+        return crypto
+            .createHmac('sha256', String(segredo))
+            .update(String(dados))
+            .digest('base64');
+    }
+};
+
 function createCriptografiaModule() {
     let bcrypt;
     try {
         bcrypt = require('bcrypt');
     } catch (e) {
-        return new Proxy({}, {
+        return new Proxy(utilitarios, {
             get: (target, prop) => {
+                if (prop in target) return target[prop];
                 if (typeof prop === 'symbol' || prop === 'then' || prop === 'inspect') {
                     return undefined;
                 }
@@ -35,7 +56,9 @@ function createCriptografiaModule() {
     }
 
     return {
-        // --- Versões assíncronas (recomendadas, não bloqueiam o event loop) ---
+        ...utilitarios,
+
+        // --- Versões assíncronas (recomendadas) ---
         gerarHash: async (senha, custo = CUSTO_PADRAO) => {
             try {
                 validarSenha(senha);
@@ -57,7 +80,7 @@ function createCriptografiaModule() {
             }
         },
 
-        // --- Versões síncronas (⚠️ bloqueiam o event loop, evite em rotas de alto tráfego) ---
+        // --- Versões síncronas (bloqueiam o event loop) ---
         gerarHashSincrono: (senha, custo = CUSTO_PADRAO) => {
             try {
                 validarSenha(senha);
