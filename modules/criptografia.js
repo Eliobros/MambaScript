@@ -91,6 +91,19 @@ function createCriptografiaModule() {
             }
         },
 
+	paraBase64Url: (texto) =>
+        Buffer.from(String(texto), 'utf8').toString('base64url'),
+
+    hmacSha256Url: (dados, segredo) => {
+        if (segredo === undefined || segredo === null || segredo === '') {
+            throw new Error("❌ hmacSha256Url requer um segredo.");
+        }
+        return crypto
+            .createHmac('sha256', String(segredo))
+            .update(String(dados))
+            .digest('base64url');
+    },
+
         compararSincrono: (senha, hash) => {
             try {
                 if (!senha || !hash) {
