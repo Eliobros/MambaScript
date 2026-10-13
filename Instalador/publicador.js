@@ -183,6 +183,8 @@ async function publicar() {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
+	console.log('STATUS:', res.statusCode);
+        console.log('BODY:', data.slice(0, 500));
             try {
                 const result = JSON.parse(data);
                 if (res.statusCode === 200 && result.sucesso) {
