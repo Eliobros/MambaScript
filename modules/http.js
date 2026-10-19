@@ -1,4 +1,22 @@
 // Módulo nativo http — requisições HTTP e servidor
+const fs = require('fs');
+const path = require('path');
+
+const MIME = {
+    '.html': 'text/html; charset=utf-8',
+    '.css': 'text/css; charset=utf-8',
+    '.js': 'application/javascript; charset=utf-8',
+    '.json': 'application/json',
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.svg': 'image/svg+xml',
+    '.ico': 'image/x-icon',
+    '.webp': 'image/webp',
+    '.txt': 'text/plain; charset=utf-8'
+};
+
 function createHttpModule(evaluator) {
     let fetch;
     try {
@@ -103,6 +121,24 @@ function createHttpModule(evaluator) {
                                     cabecalhos: req.headers
                                 };
 
+                                // Lê um arquivo do disco e envia com o Content-Type certo
+                                const enviarArquivoDisco = (caminhoAbs) => {
+                                    fs.stat(caminhoAbs, (err, st) => {
+                                        if (err || !st.isFile()) {
+                                            if (!res.headersSent) {
+                                                res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+                                            }
+                                            res.end('Arquivo não encontrado');
+                                            return;
+                                        }
+                                        const tipo = MIME[path.extname(caminhoAbs).toLowerCase()] || 'application/octet-stream';
+                                        res.writeHead(200, { 'Content-Type': tipo, 'Content-Length': st.size });
+                                        const stream = fs.createReadStream(caminhoAbs);
+                                        stream.on('error', () => res.destroy());
+                                        stream.pipe(res);
+                                    });
+                                };
+
                                 const respostaMamba = {
                                     enviar: (status, conteudo) => {
                                         const tipo = typeof conteudo === 'object' ? 'application/json' : 'text/plain; charset=utf-8';
@@ -115,7 +151,42 @@ function createHttpModule(evaluator) {
                                         res.end(JSON.stringify(conteudo));
                                     },
                                     cabecalho: (chave, valor) => { res.setHeader(chave, valor); },
-                                    redirecionar: (url) => { res.writeHead(302, { 'Location': url }); res.end(); }
+                                    redirecionar: (url) => { res.writeHead(302, { 'Location': url }); res.end(); },
+
+                                    // Envia um arquivo cujo caminho VOCÊ escreveu (ex: "index.html")
+                                    enviarArquivo: (caminho) => {
+                                        enviarArquivoDisco(path.resolve(String(caminho)));
+                                    },
+
+                                    // Serve arquivos de uma pasta (ex: servirPasta("public", requisicao.url))
+                                    // Bloqueia qualquer tentativa de sair da pasta (../)
+                                    servirPasta: (raiz, rota) => {
+                                        const base = path.resolve(String(raiz));
+                                        let rel;
+                                        try {
+                                            rel = decodeURIComponent(String(rota));
+                                        } catch {
+                                            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                                            res.end('Bad Request');
+                                            return;
+                                        }
+
+                                        if (rel.includes('\0')) {
+                                            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
+                                            res.end('Bad Request');
+                                            return;
+                                        }
+
+                                        if (rel.endsWith('/')) rel += 'index.html';
+                                        const abs = path.join(base, rel);
+
+                                        if (!abs.startsWith(base + path.sep)) {
+                                            res.writeHead(403, { 'Content-Type': 'text/plain; charset=utf-8' });
+                                            res.end('Proibido');
+                                            return;
+                                        }
+                                        enviarArquivoDisco(abs);
+                                    }
                                 };
 
                                 if (this.callbackMamba && this.callbackMamba._type === 'MambaFunction') {
