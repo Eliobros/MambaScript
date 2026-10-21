@@ -4,6 +4,7 @@ function createSistemaModule() {
     return {
         plataforma: () => process.platform,
         variavel: (nome) => process.env[nome] || null,
+        env: (nome) => process.env[nome] ?? null,
         executar: (cmd) => {
             try {
                 return execSync(cmd, { encoding: 'utf-8' }).trim();
